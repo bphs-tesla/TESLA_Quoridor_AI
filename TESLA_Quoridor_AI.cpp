@@ -1,223 +1,121 @@
 ﻿#include <stdio.h>
 #include <stdlib.h>
+#include <algorithm>
 
-void printBoard(char State[17][17], char WallCount[2]) {
-	//17*17 char 배열(State)과 WallCount(남은 벽의 수)를 받아서, 그에 대응되는 쿼리도 보드를 출력함
-	printf("+"); for (int _ = 0; _ < 17 * 3; _++) { printf("-"); }printf("+\n");
-	for (int i = 0; i < 17; i ++) {
-		printf("|");
-		if (i % 2 != 0) {
-			//행이 벽만 있는 때 
-			for (int j = 0; j < 17; j ++) {
-				if (j % 2 != 0) {
-					printf(" + ");
-					continue;
-				}
-				switch (State[i][j]) {
-				case 0x00://빈칸
-					printf("   ");
-					break;
-				case 'W'://벽
-					printf(" = ");
-					break;
-				default:
-					printf(" X ");
-					break;
-				}
+struct Quoridor
+{
+	//쿼리도 기본 시작 상태로 initialize됨
+	//쿼리도 초기 게임의 그래프를 선언 (81개의 상태 노드를 가진 그래프라고 해석시, 81*81차원의 행렬과 동치로 취급 가능)
+	bool Path[9][9][4]; //Path[행][열][상/하/좌/우] 형식으로 배열 저장
+	char WallH[8] = { NULL, }; //이거는 가로로 배치되는 벽의 격자점 위의 존재 여부를 저장한다.
+	char WallV[8] = { NULL, }; //이거는 세로로 배치되는 벽의 격자점 위의 존재 여부를 저장한다.
+	/*
+	WallH는 가로로 벽을 설치하기에, 상/하 움직임을 불가능하게 한다. ( k=0,1 )
+	WallV는 세로로 벽을 설치하기에, 좌/우 움직임을 불가능하게 한다. ( k=2,3 )
+	*/
 
-			}
+	//위의 WallH나 WallV는 사실은 8*8 bool 행렬이지만, 
+	//벽의 설치 여부가 보드의 유효성 판정에만 중요하기에, 그냥 bitpacking을 이용해, 8개의 열을 1 Byte의 char 로 압축했다. 
+	//즉, Cpp의 std::vector<bool>랑 비슷한 방식으로 만들었다.
+	// 
+	//**이 이유때문에, (WallV[행] & (1 << 열{왼쪽부터 0 ~ 7}))이런 식으로 판정해야 함 ㅎㅎ**
+	Quoridor() {
+		//Quoridor 초기 보드 상태 설정
+		std::fill(&Path[0][0][0], &Path[8][8][3], 1);
+		for (int i = 0; i < 9; i++) {
+			Path[0][i][0] = false; //맨 위쪽 줄에서 위쪽으로 갈수 없게
+			Path[8][i][1] = false; //맨 아래쪽 줄에서 아래쪽으로 갈수 없게
+			Path[i][0][2] = false; //맨 왼쪽 줄에서 왼쪽으로 갈수 없게
+			Path[i][8][3] = false; //맨 오른쪽 줄에서 오른쪽으로 갈수 없게
 		}
-		else {
-			for (int _ = 0; _ < 17 * 3; _++) { printf(" "); }printf("|\n|");
-			for (int j = 0; j < 17; j++) {
-				switch (State[i][j]) {
-				case 0x00://빈칸
-					printf("   ");
-					break;
-				case 1://플레이어 1
-					printf(" 1 ");
-					break;
-				case 2://플레이어 2
-					printf(" 2 ");
-					break;
-				case 'W'://벽
-					printf(" | ");
-					break;
-				default:
-					printf(" X ");
-					break;
-				}
-			}
-			
-			printf("|\n|"); for (int _ = 0; _ < 17 * 3; _++) { printf(" "); }
-		}
-
-		printf("|\n");
-
 	}
-	printf("+"); for (int _ = 0; _ < 17 * 3; _++) { printf("-"); }printf("+\n");
-	printf("P1: %d P2: %d\n",WallCount[0],WallCount[1]);
+	char P1[2] = { 8,4 }; //P1의 보드 위의 행/열
+	char P2[2] = { 0,4 }; //P2의 보드 위의 행/열
+	char WallCount[2] = { 10,10 }; //P1,P2의 남은 벽 개수(10이 기본이고, 벽을 쓸수록 감소함)
+	bool isP2Turn = false; // P1의 차례이면, false, P2의 차례이면 true (P1이 선공이라서 false가 기본)
+
+};
+
+int placeWallH(Quoridor* Board, char Pos[2]) {
+	if (Pos[0] > 8) {return 1;} //유효하지 않은 좌표
+	if (!((Board->WallH)[Pos[0]] & (1 << (Pos[1] - 1)))) {
+		//Pos[0], Pos[1] - 1 위치의 가로 벽이 있는지 체크(없으면 이쪽 실행)
+		if (!((Board->WallH)[Pos[0]] & (1 << (Pos[1] + 1)))) {
+			//Pos[0], Pos[1] + 1 위치의 가로 벽이 있는지 체크(없으면 이쪽 실행)
+			if (Z)
+		}
+	}
+
+
+	(Board->Path)[Pos[0] + 1][Pos[1]][0] = false;
+	(Board->Path)[Pos[0] + 1][Pos[1] + 1][0] = false;
+	(Board->Path)[Pos[0]][Pos[1]][1] = false;
+	(Board->Path)[Pos[0]][Pos[1] + 1][1] = false;
+
+	//가로로 벽을 배치하는 코드 ( k=0,1 )
+	//불가능하면 1 반환, 가능하면 0 반환
 }
 
-int findLegalMoves(char State[17][17], char WallCount[2],bool isP2turn) {
-	//보드의 상태를 받아, 현재 상태에서 규칙상 허용되는 모든 수를 array에 담고, 그 array의 포인터를 반환
-	//이것은 후에 트리 탐색을 구현할때 사용되어야 하기에, 최적화가 잘 되어있어야 함
-	//그리고 그 이유로 이 함수는 *매우* 중요함
-	//bool isP2turn은 False이면, P1의 차례, True이면 P2의 차례이다.
-	//이 함수는 [][5] 크기의 배열 포인터를 반환한다.
-	
-	int BufferCapacity = 1024 * 5;//버퍼의 크기 정의( 이 이상이면 재할당시킴)
-	int ByteCount = 0;//지금까지 사용된 버퍼 바이트 저장
-	char* LegalMoves;
-	LegalMoves = (char*)calloc(BufferCapacity, sizeof(char));
+int placeWallV(Quoridor* Board, char Pos[2]) {
+	(Board->Path)[Pos[0]][Pos[1] + 1][2] = false;
+	(Board->Path)[Pos[0] + 1][Pos[1] + 1][2] = false;
+	(Board->Path)[Pos[0]][Pos[1]][3] = false;
+	(Board->Path)[Pos[0] + 1][Pos[1]][3] = false;
 
-	if (LegalMoves == NULL) {
-		//메모리 할당 실패
-		printf("FindLegalMoves(): Memory Allocation Failure\n");
-		free(LegalMoves);
-		return 1;
-	}
+	//가로로 벽을 배치하는 코드 ( k=0,1 )
+	//불가능하면 1 반환, 가능하면 0 반환
+}
 
-	//메모리 다 사용시, 메모리를 재할당하는 코드 
-	if (ByteCount == BufferCapacity) {
-		//LegalMoves의 공간을 다 사용했을때, 메모리 재할당
-		printf("Buffer full, Reallocating...\n");
-		BufferCapacity *= 2;
-		char* BufferRealloc = (char*)realloc(LegalMoves, sizeof(char));
-		if (BufferRealloc == NULL) {
-			//메모리 할당 실패
-			printf("FindLegalMoves(): Memory Reallocation Failure\n");
-			free(LegalMoves);
-			return 1;
+
+
+void printBoard(struct Quoridor Board) {
+	//Quoridor를 받아서, 그에 대응되는 쿼리도 보드를 출력함
+
+	char BoardSum[17][17] = { "0", };
+	BoardSum[Board.P1[0]][Board.P1[1]] = 1;
+	BoardSum[Board.P2[0]][Board.P2[1]] = 2;
+/*
+	putchar('+'); for (int _ = 0; _ < 3 * 17; _++) { putchar('-'); }printf("+\n|");
+	for (int i = 0; i < 17 * 3; i++) {
+		if ((i % 4) == 3) {
+			printf("|");
+			for (int j = 0; j < 9; j++) {
+				if ()
+				printf("d");
+			}
 		}
-		else { LegalMoves = BufferRealloc; }
-	}
-	/////////////////////////////////////////
-	//아래서부터 가능한 모든 수 계산하는 코드
-	////////////////////////////////////////
-	char WallsLeft = WallCount[(int)isP2turn];
-	//이번 차례에 해당하는 Player의 좌표 찾기
-	//Player의 위치를 저장하는 배열(이 x,y 좌표는 행렬의 행/열을 저장한 것이기에 x,y로 변환시켜야 한다{가독성은 떨어지지만, 연산할때는 이 방식이 더 효율적)
-	char PlayerPos[2] = { 0,0 };
-	for (int i = 0; i < 17; i++) {
 		for (int j = 0; j < 17; j++) {
-			if (State[i][j] == (int)isP2turn + 1) {
-				//지금 차례에 해당하는 플레이어의 좌표를 State에서 추출
-				PlayerPos[0] = i;
-				PlayerPos[1] = j;
-			}
+
 		}
 	}
-	//현재 플레이어가 갈 수 있는 방향 계산
-	
-	printf("Player's Current Position(in Array): %d , %d \n", PlayerPos[0], PlayerPos[1]);
-
-	return 0;
-
-	
+*/
 }
-
-bool isLegalMove(char State[17][17], char WallCount[2], bool isP2turn, char PlayerPos[2], char Move[5]) {
-	//이 함수는 쿼리도 보드의 상태와 하려는 동작을 받아서, 이 수가 가능하다면 true, 불가능하다면 false를 반환한다.
-	switch (Move[0]) {
-	case 'M':
-		//플레이어가 이동
-		char PlayerNewPos[2] = { PlayerPos[0], PlayerPos[1] };
-		switch (Move[1]) {
-		case 'U':
-			//플레이어가 위로 이동
-			PlayerNewPos[1] -= 2;
-			if (PlayerNewPos[1] < 0) {
-				return false;//플레이어가 가려는 방향이 보드 밖인지 확인(안하면 배열 밖의 원소 접근으로 undefined 활동)
-			}
-			else if (State[PlayerNewPos[0]][PlayerNewPos[1]] == 'W') {
-				return false;
-			}
-			else if ((State[PlayerNewPos[0]][PlayerNewPos[1]] == '1') || (State[PlayerNewPos[0]][PlayerNewPos[1]] == '2')) {
-				PlayerNewPos[1] -= 2;
-				if (PlayerNewPos[1] < 0) {
-					return false;//플레이어가 가려는 방향이 보드 밖인지 확인(안하면 배열 밖의 원소 접근으로 undefined 활동)
-				}return true;
-			}
-		case 'D':
-			//아래로 이동
-			PlayerNewPos[1] += 2;
-			if (PlayerNewPos[1] >= 17) {
-				return false;//플레이어가 가려는 방향이 보드 밖인지 확인(안하면 배열 밖의 원소 접근으로 undefined 활동)
-			}
-			else if (State[PlayerNewPos[0]][PlayerNewPos[1]] == 'W') {
-				return false;
-			}
-			else if ((State[PlayerNewPos[0]][PlayerNewPos[1]] == '1') || (State[PlayerNewPos[0]][PlayerNewPos[1]] == '2')) {
-				PlayerNewPos[1] += 2;
-				if (PlayerNewPos[1] >= 17) {
-					return false;//플레이어가 가려는 방향이 보드 밖인지 확인(안하면 배열 밖의 원소 접근으로 undefined 활동)
-				}return true;
-		case 'L':
-			//왼쪽으로 이동
-			PlayerNewPos[0] -= 2;
-			if (PlayerNewPos[0] < 0) {
-				return false;//플레이어가 가려는 방향이 보드 밖인지 확인(안하면 배열 밖의 원소 접근으로 undefined 활동)
-			}
-			else if (State[PlayerNewPos[0]][PlayerNewPos[1]] == 'W') {
-				return false;
-			}
-			else if ((State[PlayerNewPos[0]][PlayerNewPos[1]] == '1') || (State[PlayerNewPos[0]][PlayerNewPos[1]] == '2')) {
-				PlayerNewPos[0] -= 2;
-				if (PlayerNewPos[0] < 0) {
-					return false;//플레이어가 가려는 방향이 보드 밖인지 확인(안하면 배열 밖의 원소 접근으로 undefined 활동)
-				}return true;
-		case 'R':
-			//오른쪽으로 이동
-			PlayerNewPos[0] += 2;
-			if (PlayerNewPos[0] >= 17) {
-				return false;//플레이어가 가려는 방향이 보드 밖인지 확인(안하면 배열 밖의 원소 접근으로 undefined 활동)
-			}
-			else if (State[PlayerNewPos[0]][PlayerNewPos[1]] == 'W') {
-				return false;
-			}
-			else if ((State[PlayerNewPos[0]][PlayerNewPos[1]] == '1') || (State[PlayerNewPos[0]][PlayerNewPos[1]] == '2')) {
-				PlayerNewPos[0] += 2;
-				if (PlayerNewPos[0] >= 17) {
-					return false;//플레이어가 가려는 방향이 보드 밖인지 확인(안하면 배열 밖의 원소 접근으로 undefined 활동)
-				}return true;
-
-	case 'W':
-		//벽을 설치하는 명령
-		for (int i = 0; i < 2; i++) {
-			if ((0 <= Move[i]) && (Move[i] <= 17) && (0 <= Move[i+1]) && (Move[i+1] <= 17)) {
-				//바운더리 체크
-				if (State[Move[i]][Move[i + 1]] == 'W') {
-
-				}
-
-
-			}
-		}
-	}
-
-}
-
-
-
-
-
 
 
 int main() {
-	char StartState[17][17];
-	for (int i = 0; i < 17; i++) {
-		for (int j = 0; j < 17; j++) {
-			StartState[i][j] = 0;
+	struct Quoridor Board;
+	
+	for (int k = 0; k < 4; k++) { //갈수있는 방향
+		printf("\nk = %d\n",k);
+		for (int i = 0; i < 9; i++) { //행
+			printf("[ ");
+			for (int j = 0; j < 9; j++) { //열
+				switch (Board.Path[i][j][k]) {
+				case 1:
+					printf("1 ");
+					break;
+				case 0:
+					printf("0 ");
+					break;
+				}
+			}
+			printf("]\n");
 		}
 	}
-	StartState[0][8] = 2;
-	StartState[16][8] = 1;
-	char StartWallCount[2] = {10,10};
-	//이게 쿼리도 기본 시작 상태
-	//StartState[16][15] = 'W';
-	printf("Player1's turn\n");
-	printBoard(StartState,StartWallCount);//쿼리도 보드 출력
-	findLegalMoves(StartState, StartWallCount, false);//쿼리도 보드에서 합법척인 수 찾기
+	printf("Path Size: %d", (int)sizeof(Board.Path));
+
+	//printBoard(Board);//쿼리도 보드 출력
+	//findLegalMoves(StartState, StartWallCount, false);//쿼리도 보드에서 합법척인 수 찾기
+
 	return 0;
 }
