@@ -127,6 +127,18 @@ int main() {
 			printf("]\n");
 		}
 	}
+	for (int i = 0; i < 8; i++) {
+		for (int j = 0; j < 8; j++) {
+			if ((Board.WallV[i] & (1 << j))) {
+				printf("1 ");
+			}
+			else {
+				printf("0 ");
+			}
+		}
+		printf("\n");
+	}
+	printf("\n%d\n", Board.WallV[3]);
 	printf("Path Size: %d", (int)sizeof(Board.Path));
 
 	//printBoard(Board);//쿼리도 보드 출력
