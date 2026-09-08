@@ -37,33 +37,45 @@ struct Quoridor
 };
 
 int placeWallH(Quoridor* Board, char Pos[2]) {
-	if (Pos[0] > 8) {return 1;} //유효하지 않은 좌표
+	//가로로 벽을 배치하는 코드 ( k=0,1 )
+	//불가능하면 1 반환, 가능하면 0 반환
+	if (Pos[0] >= 8) {return 1;} //유효하지 않은 좌표 예외 처리
 	if (!((Board->WallH)[Pos[0]] & (1 << (Pos[1] - 1)))) {
 		//Pos[0], Pos[1] - 1 위치의 가로 벽이 있는지 체크(없으면 이쪽 실행)
 		if (!((Board->WallH)[Pos[0]] & (1 << (Pos[1] + 1)))) {
 			//Pos[0], Pos[1] + 1 위치의 가로 벽이 있는지 체크(없으면 이쪽 실행)
-			if (Z)
+			//벽 설치 코드
+			(Board->WallH)[Pos[0]] = (Board->WallH)[Pos[0]] | (1 << (Pos[1])); //WallH 업데이트
+			//Path 업데이트
+			(Board->Path)[Pos[0] + 1][Pos[1]][0] = false;
+			(Board->Path)[Pos[0] + 1][Pos[1] + 1][0] = false;
+			(Board->Path)[Pos[0]][Pos[1]][1] = false;
+			(Board->Path)[Pos[0]][Pos[1] + 1][1] = false;
+			return 0; //정상적으로 Path & WallH 업데이트
 		}
 	}
-
-
-	(Board->Path)[Pos[0] + 1][Pos[1]][0] = false;
-	(Board->Path)[Pos[0] + 1][Pos[1] + 1][0] = false;
-	(Board->Path)[Pos[0]][Pos[1]][1] = false;
-	(Board->Path)[Pos[0]][Pos[1] + 1][1] = false;
-
-	//가로로 벽을 배치하는 코드 ( k=0,1 )
-	//불가능하면 1 반환, 가능하면 0 반환
+	return 1;
 }
 
 int placeWallV(Quoridor* Board, char Pos[2]) {
-	(Board->Path)[Pos[0]][Pos[1] + 1][2] = false;
-	(Board->Path)[Pos[0] + 1][Pos[1] + 1][2] = false;
-	(Board->Path)[Pos[0]][Pos[1]][3] = false;
-	(Board->Path)[Pos[0] + 1][Pos[1]][3] = false;
-
-	//가로로 벽을 배치하는 코드 ( k=0,1 )
+	//세로로 벽을 배치하는 코드 ( k=2,3 )
 	//불가능하면 1 반환, 가능하면 0 반환
+	if (Pos[0] >= 8) { return 1; } //유효하지 않은 좌표 예외 처리
+	if (!((Board->WallV)[Pos[0]] & (1 << (Pos[1] - 1)))) {
+		//Pos[0], Pos[1] - 1 위치의 세로 벽이 있는지 체크(없으면 이쪽 실행)
+		if (!((Board->WallV)[Pos[0]] & (1 << (Pos[1] + 1)))) {
+			//Pos[0], Pos[1] + 1 위치의 세로 벽이 있는지 체크(없으면 이쪽 실행)
+			//벽 설치 코드
+			(Board->WallV)[Pos[0]] = (Board->WallH)[Pos[0]] | (1 << (Pos[1])); //WallV 업데이트
+			//Path 업데이트
+			(Board->Path)[Pos[0]][Pos[1] + 1][2] = false;
+			(Board->Path)[Pos[0] + 1][Pos[1] + 1][2] = false;
+			(Board->Path)[Pos[0]][Pos[1]][3] = false;
+			(Board->Path)[Pos[0] + 1][Pos[1]][3] = false;
+			return 0; //정상적으로 Path & WallV 업데이트
+		}
+	}
+	return 1;
 }
 
 
@@ -94,7 +106,10 @@ void printBoard(struct Quoridor Board) {
 
 int main() {
 	struct Quoridor Board;
-	
+	//char H[2] = { 0,0 };
+	char V[2] = { 3,4 };
+	//placeWallH(&Board, H);
+	placeWallV(&Board, V);
 	for (int k = 0; k < 4; k++) { //갈수있는 방향
 		printf("\nk = %d\n",k);
 		for (int i = 0; i < 9; i++) { //행
