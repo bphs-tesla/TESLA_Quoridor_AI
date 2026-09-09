@@ -141,7 +141,21 @@ bool isLegalMove(Quoridor* Board, uint8_t Move) {
 	switch (Move & (0b11 << 6)) {
 	case (0b00 << 6):
 		//0b00[명령1(3비트)][명령2(3비트)] 점프 X
-		break;
+		/*상/하/좌/우 인지에 따라, 명령 1이 0 ~ 3까지를 표시한다*/
+		if (MoveVariable[0] > 3) { return false; } //정의되지 않은 범위
+		if (Board->isP1Turn) {
+			//P1의 차례(P1이 이동할때)
+			if (Board->Path[Board->P1[0]][Board->P1[1]][MoveVariable[0]]) {
+				//이동 가능
+				return true;
+			}
+		}else {
+			//P2의 차례
+			if (Board->Path[Board->P2[0]][Board->P2[1]][MoveVariable[0]]) {
+				//이동 가능
+				return true;
+		}
+			return false; //예외 처리(Path에 1이 존재하지 않음, 즉 벽에 가로막힘)
 	case (0b01 << 6):
 		//0b01[명령1(3비트)][명령2(3비트)] 점프 O
 		break;
@@ -167,11 +181,12 @@ int HeuristicEstimation(Quoridor* Board) {
 	/*재민이 화이팅 ㅎㅎ*/
 }
 
-int MakeChildNode(Quoridor Board, int SearchTreeDepth) {
+int MakeChildNode(Quoridor* Board, int SearchTreeDepth) {
 	if (SearchTreeDepth <= 0) {
 		//탐색 깊이 최대 도달
-		return HeuristicEstimation(&Board);
+		return HeuristicEstimation(Board);
 	}
+
 	/*
 	
 	마법
@@ -190,12 +205,13 @@ int main() {
 	uint8_t H[2] = { 0,0 };
 	uint8_t H2[2] = { 1,2 };
 	uint8_t V[2] = { 1,3 };
+	uint8_t V2[2] = { 2,3 };
 	//uint8_t V[2] = { 3,4 };
 	PlaceWallH(&Board, H);
 	PlaceWallVt(&Board, V);
-	PlaceWallH(&Board, V);
+	//PlaceWallVt(&Board, V2);
 	
-	switch (isLegalMove(&Board, 0b10000001)) {
+	switch (isLegalMove(&Board, 0b11010011)) {
 	case false:
 		printf("0\n");
 		break;
