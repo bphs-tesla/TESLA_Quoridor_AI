@@ -170,7 +170,20 @@ int main() {
 			printf("]\n");
 		}
 	}
-	printf("\n");
+	printf("\nWallH\n");
+	for (int i = 0; i < 8; i++) {
+		for (int j = 0; j < 8; j++) {
+			if ((Board.WallH[i] & (1 << j))) {
+				printf("1 ");
+			}
+			else {
+				printf("0 ");
+			}
+		}
+		printf("\n");
+	}
+
+	printf("\nWallVt\n");
 	for (int i = 0; i < 8; i++) {
 		for (int j = 0; j < 8; j++) {
 			if ((Board.WallVt[i] & (1 << j))) {
@@ -182,6 +195,7 @@ int main() {
 		}
 		printf("\n");
 	}
+
 	
 
 
