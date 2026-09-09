@@ -52,8 +52,7 @@ int PlaceWallH(Quoridor* Board, uint8_t GridPos[2]) {
 	//불가능하면 1 반환, 가능하면 0 반환
 	if ((GridPos[0] >= 8) || (GridPos[1] >= 8)) { return 1; } //유효하지 않은 좌표 예외 처리
 	if (isWall(Board, GridPos)) { return 1; }
-	if (GridPos[1] != 0 && (Board->WallH[GridPos[0]] & (0b101 << (GridPos[1] - 1)))) { return 1; } //인접한 곳에 벽이 있어 충돌판정
-
+	if ((Board->WallH[GridPos[0]] | 1 << GridPos[1]) & (((Board->WallH[GridPos[0]] | 1 << GridPos[1]) >> 1) | ((Board->WallH[GridPos[0]] | 1 << GridPos[1]) << 1))) { return 1; }//인접한 곳에 벽이 있어 충돌판정
 	//Pos[0], Pos[1] - 1 위치의 가로 벽이 있는지 체크(없으면 이쪽 실행)
 	//Pos[0], Pos[1] + 1 위치의 가로 벽이 있는지 체크(없으면 이쪽 실행)
 	//벽 설치 코드
@@ -72,7 +71,7 @@ int PlaceWallVt(Quoridor* Board, uint8_t GridPos[2]) {
 	//불가능하면 1 반환, 가능하면 0 반환
 	if ((GridPos[0] >= 8) || (GridPos[1] >= 8)) { return 1; } //유효하지 않은 좌표 예외 처리
 	if (isWall(Board, GridPos)) { return 1; }
-	if (GridPos[0] != 0 && (Board->WallH[GridPos[1]] & (0b101 << (GridPos[0] - 1)))) { return 1; } //인접한 곳에 벽이 있어 충돌판정
+	if ((Board->WallVt[GridPos[1]] | 1 << GridPos[0]) & (((Board->WallVt[GridPos[1]] | 1 << GridPos[0]) >> 1) | ((Board->WallVt[GridPos[1]] | 1 << GridPos[0]) << 1))) { return 1; }//인접한 곳에 벽이 있어 충돌판정
 	//Pos[0], Pos[1] +- 1 위치의 세로 벽이 있는지 체크(없으면 이쪽 실행)
 	//벽 설치 코드
 	(Board->WallVt)[GridPos[1]] = (Board->WallVt)[GridPos[1]] | (1 << (GridPos[0])); //WallVt 업데이트
@@ -85,6 +84,7 @@ int PlaceWallVt(Quoridor* Board, uint8_t GridPos[2]) {
 
 }
 
+//(지금은) 작동 안됨
 void PrintBoard(struct Quoridor Board) {
 	//Quoridor를 받아서, 그에 대응되는 쿼리도 보드를 출력함
 	putchar('+'); for (int _ = 0; _ < 53; _++) { putchar('-'); }printf("+\n");
@@ -147,17 +147,11 @@ bool isLegalMove(Quoridor* Board, uint8_t Move) {
 		break;
 	case (0b10 << 6):
 		//0b10[행(3비트)][열(3비트)] 가로 벽 설치
-		if (MoveVariable[1] != 0 && (Board->WallH[MoveVariable[0]] & (0b101 << (MoveVariable[1] - 1)))) {
-			//인접한 곳에 벽이 있어 충돌판정
-			return false;
-		}
+		if ((Board->WallH[MoveVariable[0]] | 1 << MoveVariable[1]) & (((Board->WallH[MoveVariable[0]] | 1 << MoveVariable[1]) >> 1) | ((Board->WallH[MoveVariable[0]] | 1 << MoveVariable[1]) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
 		return !isWall(Board, MoveVariable); //가로 벽 설치 가능 여부 판단(bitshift때문에, 범위 판정은 안해도 됨)
 	case (0b11 << 6):
 		//0b11[행(3비트)][열(3비트)] 세로 벽 설치
-		if (MoveVariable[0] != 0 && (Board->WallVt[MoveVariable[1]] & (0b101 << (MoveVariable[0] - 1)))) {
-			//인접한 곳에 벽이 있어 충돌판정
-			return false;
-		}
+		if ((Board->WallVt[MoveVariable[1]] | 1 << MoveVariable[0]) & (((Board->WallVt[MoveVariable[1]] | 1 << MoveVariable[0]) >> 1) | ((Board->WallVt[MoveVariable[1]] | 1 << MoveVariable[0]) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
 		return !isWall(Board, MoveVariable); //세로 벽 설치 가능 여부 판단(bitshift때문에, 범위 판정은 안해도 됨)
 	}
 	return false; //어떻게 여기까지 올 수 있는지는 모르겠지만????? 만일을 위해서 예외 처리
@@ -198,9 +192,9 @@ int main() {
 	uint8_t V[2] = { 1,3 };
 	//uint8_t V[2] = { 3,4 };
 	PlaceWallH(&Board, H);
-	//PlaceWallVt(&Board, V);
+	PlaceWallVt(&Board, V);
 	PlaceWallH(&Board, V);
-	/*
+	
 	switch (isLegalMove(&Board, 0b10000001)) {
 	case false:
 		printf("0\n");
@@ -209,7 +203,7 @@ int main() {
 		printf("1\n");
 		break;
 	}
-	*/
+	
 
 
 
