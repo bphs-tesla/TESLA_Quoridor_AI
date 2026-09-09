@@ -40,11 +40,17 @@ struct Quoridor
 //Quoridor 보드(의 메모리 주소)를 받아서 벽을 배치하는 함수
 //WallVt는 전치되어서 t가 붙음
 
+
+bool isWall(Quoridor* Board, uint8_t GridPos[2]) {
+	if ((GridPos[0] >= 8) || (GridPos[1] >= 8)) { return true; } //유효하지 않은 좌표 예외 처리
+	if ((Board->WallVt)[GridPos[1]] & (1 << GridPos[0])) { return true; } //그 자리에 이미 벽이 존재
+	if ((Board->WallH)[GridPos[0]] & (1 << GridPos[1])) { return true; } //그 자리에 이미 벽이 존재
+	return false;
+}
 int PlaceWallH(Quoridor* Board, uint8_t GridPos[2]) {
 	//가로로 벽을 배치하는 코드 ( k=0,1 )
 	//불가능하면 1 반환, 가능하면 0 반환
-	if ((GridPos[0] >= 8) || (GridPos[1] >= 8)) { return 1; } //유효하지 않은 좌표 예외 처리
-	if ((Board->WallVt)[GridPos[1]] & (1 << GridPos[0])) { return 1; } //그 자리에 이미 벽이 존재
+	if (isWall(Board, GridPos)) { return 1; }
 	if (!((Board->WallH)[GridPos[0]] & (1 << (GridPos[1] - 1)))) {
 		//Pos[0], Pos[1] - 1 위치의 가로 벽이 있는지 체크(없으면 이쪽 실행)
 		if (!((Board->WallH)[GridPos[0]] & (1 << (GridPos[1] + 1)))) {
@@ -65,8 +71,7 @@ int PlaceWallH(Quoridor* Board, uint8_t GridPos[2]) {
 int PlaceWallVt(Quoridor* Board, uint8_t GridPos[2]) {
 	//세로로 벽을 배치하는 코드 ( k=2,3 )
 	//불가능하면 1 반환, 가능하면 0 반환
-	if ((GridPos[0] >= 8) || (GridPos[1] >= 8)) { return 1; } //유효하지 않은 좌표 예외 처리
-	if ((Board->WallH)[GridPos[0]] & (1 << GridPos[1])) {return 1;} //그 자리에 이미 벽이 존재
+	if (isWall(Board, GridPos)) { return 1; }
 	if (!((Board->WallVt)[GridPos[1]] & (1 << (GridPos[0] - 1)))) {
 		//Pos[0], Pos[1] - 1 위치의 세로 벽이 있는지 체크(없으면 이쪽 실행)
 		if (!((Board->WallVt)[GridPos[1]] & (1 << (GridPos[0] + 1)))) {
@@ -135,6 +140,9 @@ bool isLegalMove(Quoridor* Board, uint8_t Move) {
 	//0b[플레이어/벽설치][가로/세로][행(3비트)][열(3비트)] 가로: 0, 세로: 1
 	//0b0[점프 유무][명령1(3비트)][명령2(3비트)] 점프시 1, 아니면 0
 	//0b1[가로/세로][행(3비트)][열(3비트)]
+	uint8_t MoveVariable[2];
+	MoveVariable[0] = (Move & (0b111 << 3)) >> 3;
+	MoveVariable[1] = Move & 0b111;
 	switch(Move & (0b11 << 6)) {
 	case (0b10 << 6):
 		//0b01[명령1(3비트)][명령2(3비트)] 점프 X
@@ -146,10 +154,7 @@ bool isLegalMove(Quoridor* Board, uint8_t Move) {
 		//벽 설치
 		//행: (Move & (0b111 << 3)) >> 3
 		//열: (Move & 0b111)
-		if ((((Board->WallH)[(Move & (0b111 << 3)) >> 3] & (1 << (Move & 0b111)))) || ((Board->WallVt)[Move & (1 << (Move & 0b111))] & ((Move & (0b111 << 3)) >> 3))) {
-			//벽이 존재(불가능)
-			return 1;
-		}
+
 			
 		//(0b11111111 & (0b111 << 3) >> 3)
 
