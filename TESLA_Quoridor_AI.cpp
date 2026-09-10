@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <vector>
+#include <queue>
 
 struct Quoridor
 {
@@ -45,6 +46,30 @@ bool isWall(Quoridor* Board, uint8_t GridPos[2]) {
 	if ((Board->WallVt)[GridPos[1]] & (1 << GridPos[0])) { return true; } //그 자리에 이미 벽이 존재
 	if ((Board->WallH)[GridPos[0]] & (1 << GridPos[1])) { return true; } //그 자리에 이미 벽이 존재
 	return false;
+}
+
+bool isConnected(Quoridor* Board, uint8_t GridPos[2]) {
+	//GridPos에 벽을 설치하는것이 가능하다는 전제로 이 함수가 실행됨(체크 별도로 해야함)
+
+}
+
+std::vector<uint8_t> AStar (Quoridor* Board) {
+	//uint8_t Destination = Board->isP1Turn ? 0 : 8; // 목적지 설정
+	//P1 검사 
+	std::vector<uint8_t> AStar_Path;
+	//f = 비용g(n) + 휴리스틱h(n)
+
+	return AStar_Path;
+}
+
+inline uint8_t AStar_HeuristicCost(Quoridor* Board, uint8_t PlayerPos[2] ) {
+	//휴리스틱비용
+	return (Board->isP1Turn ? 0 : 8) > PlayerPos[0] ? (Board->isP1Turn ? 0 : 8) - PlayerPos[0] : PlayerPos[0] - (Board->isP1Turn ? 0 : 8);
+}
+
+inline uint8_t AStar_AccumulatedCost() {
+	//누적비용
+	return 0;
 }
 
 int PlaceWallH(Quoridor* Board, uint8_t GridPos[2]) {
@@ -158,6 +183,14 @@ bool isLegalMove(Quoridor* Board, uint8_t Move) {
 			return false; //예외 처리(Path에 1이 존재하지 않음, 즉 벽에 가로막힘)
 	case (0b01 << 6):
 		//0b01[명령1(3비트)][명령2(3비트)] 점프 O
+		if (Board->Path[Board->P2[0]][Board->P2[1]][MoveVariable[0]]) {
+			//이동 가능
+
+			return true;
+		}
+
+		
+
 		break;
 	case (0b10 << 6):
 		//0b10[행(3비트)][열(3비트)] 가로 벽 설치
@@ -186,6 +219,7 @@ int MakeChildNode(Quoridor* Board, int SearchTreeDepth) {
 		//탐색 깊이 최대 도달
 		return HeuristicEstimation(Board);
 	}
+
 
 	/*
 	
