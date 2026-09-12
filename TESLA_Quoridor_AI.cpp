@@ -256,7 +256,7 @@ int AStar_MakeChildNode(Quoridor* Board, std::priority_queue<AStar_Node>* AStar_
 			ChildNode.Position = ParentNode.Position; //초기에 이동 전에는 부모 노드와 같음(즉, 초기 선언)
 			ChildNode.Position[i / 2] += ((i % 2) == 0) ? -1 : 1; //상하좌우에 따라 ChildNode의 위치를 +-1(이동)
 			if (ChildNode.Position[0] == Destination) { return ChildNode.AccumulatedCost; } //자식 노드가 목표면 누적비용(거리) 반환
-			if (std::find(AStar_ClosedNodes->begin(), AStar_ClosedNodes->end(), ChildNode.Position) != AStar_ClosedNodes->end()) {
+			if (std::find(AStar_ClosedNodes->begin(), AStar_ClosedNodes->end(), ChildNode.Position) == AStar_ClosedNodes->end()) {
 				//AStar_ClosedNodes에 존재하지 않음(새로운 노드 >> 자식 생성)
 				ChildNode.HeuristicCost = AStar_HeuristicCost(&ChildNode, Destination); //휴리스틱 비용 계산
 				ChildNode.Cost = ChildNode.AccumulatedCost + ChildNode.HeuristicCost;
@@ -264,6 +264,8 @@ int AStar_MakeChildNode(Quoridor* Board, std::priority_queue<AStar_Node>* AStar_
 			}
 		}
 	}
+	printf("AStar_Nodes Size: %d\n", (int)AStar_Nodes->size());
+	printf("AStar_ClosedNodes Size: %d\n", (int)AStar_ClosedNodes->size());
 	return 0;
 }
 
@@ -282,11 +284,13 @@ int AStar(Quoridor* Board) {
 
 	RootNode.HeuristicCost = AStar_HeuristicCost(&RootNode, Destination); //루트 노드 휴리스틱
 	RootNode.AccumulatedCost = 0; //루트 노드라서 누적 비용 = 0
+	AStar_Nodes.emplace(RootNode);
 
 	int Distance;
 	while (!AStar_Nodes.empty()) {
 		//AStar_Nodes에 원소 존재
 		Distance = AStar_MakeChildNode(Board, &AStar_Nodes, &AStar_ClosedNodes, Destination);
+		
 		if (Distance) {
 			// 목적지 도달하는 자식노드 발견
 			return Distance;
@@ -294,8 +298,6 @@ int AStar(Quoridor* Board) {
 	}
 	return 0;//목적지로 가는 경로 존재 X
 }
-
-
 
 int main() {
 	struct Quoridor Board;
@@ -307,8 +309,9 @@ int main() {
 	Board.PlaceWallH(H);
 	Board.PlaceWallVt(V);
 	//PlaceWallVt(&Board, V2);
-	
-	switch (Board.isLegalMove(0b11010011)) {
+	printf("Distance: %d\n\n", AStar(&Board));
+	/*
+		switch (Board.isLegalMove(0b11010011)) {
 	case false:
 		printf("0\n");
 		break;
@@ -317,9 +320,6 @@ int main() {
 		break;
 	}
 	
-
-
-
 
 	//PlaceWallV(&Board, V);
 
@@ -369,6 +369,8 @@ int main() {
 
 	//PrintBoard(Board);//쿼리도 보드 출력
 	//findLegalMoves(StartState, StartWallCount, false);//쿼리도 보드에서 합법적인 수 찾기
+
+	*/
 
 	return 0;
 }
