@@ -264,8 +264,8 @@ int AStar_MakeChildNode(Quoridor* Board, std::priority_queue<AStar_Node>* AStar_
 			}
 		}
 	}
-	printf("AStar_Nodes Size: %d\n", (int)AStar_Nodes->size());
-	printf("AStar_ClosedNodes Size: %d\n", (int)AStar_ClosedNodes->size());
+	//printf("AStar_Nodes Size: %d\n", (int)AStar_Nodes->size());
+	//printf("AStar_ClosedNodes Size: %d\n", (int)AStar_ClosedNodes->size());
 	return 0;
 }
 
