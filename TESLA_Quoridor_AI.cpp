@@ -56,8 +56,7 @@ struct Quoridor
 
 	}
 	//Quoridor 보드(의 메모리 주소)를 받아서 벽을 배치하는 함수
-	//WallVt는 전치되어서 t가 붙음
-	int PlaceWallVt(uint8_t GridPos[2]) {
+	int PlaceWallV(uint8_t GridPos[2]) {
 		//세로로 벽을 배치하는 코드 ( k=2,3 )
 		//불가능하면 1 반환, 가능하면 0 반환
 		if ((GridPos[0] >= 8) || (GridPos[1] >= 8)) { return 1; } //유효하지 않은 좌표 예외 처리
@@ -67,10 +66,10 @@ struct Quoridor
 		//벽 설치 코드
 		(this->WallVt)[GridPos[1]] = (this->WallVt)[GridPos[1]] | (1 << (GridPos[0])); //WallVt 업데이트
 		//Path 업데이트
-		(this->Path)[GridPos[1]][GridPos[0] + 1][2] = false;
-		(this->Path)[GridPos[1] + 1][GridPos[0] + 1][2] = false;
-		(this->Path)[GridPos[1]][GridPos[0]][3] = false;
-		(this->Path)[GridPos[1] + 1][GridPos[0]][3] = false;
+		(this->Path)[GridPos[0]][GridPos[1] + 1][2] = false;
+		(this->Path)[GridPos[0] + 1][GridPos[1] + 1][2] = false;
+		(this->Path)[GridPos[0]][GridPos[1]][3] = false;
+		(this->Path)[GridPos[0] + 1][GridPos[1]][3] = false;
 		return 0; //정상적으로 Path & WallV 업데이트
 	}
 
@@ -85,43 +84,74 @@ struct Quoridor
 		return false;
 	}
 
-	//(지금은) 작동 안됨
-	void PrintBoard(){
+ 	void PrintBoard(){		
+		//이거는 UI관련이라 대놓고 개같이 짤거임 ㅅㄱ
 		//Quoridor를 받아서, 그에 대응되는 쿼리도 보드를 출력함
-		putchar('+'); for (int _ = 0; _ < 53; _++) { putchar('-'); }printf("+\n");
-
-		for (int i = 0; i < 35; i++) {
-			printf("|");
-			if ((i % 4) == 3) {
-				//가로벽 설치
-				for (int j = 0; j < 53; j++) {
-					if ((j % 6) == 5) {
-						printf("+");
+		char c;
+		putchar('+'); for (int _ = 0; _ < 7 * 9 + 8; _++) { putchar('-'); }printf("+\n");
+		for (int i = 0; i < 9 + 8; i++) {
+			if (i % 2 == 0) {
+				//짝수(세로벽 설치)
+				for (int _i = 0; _i < 3; _i++) {
+					printf("|");
+					for (int j = 0; j < 9 + 8; j++) {
+						if (j % 2 == 0) {
+							//칸
+							if (_i == 1) {
+								if ((this->P1[0] == i / 2) && (this->P1[1] == j / 2)) {
+									printf("   1   ");
+								}
+								else if ((this->P2[0] == i / 2) && (this->P2[1] == j / 2)) {
+									printf("   2   ");
+								}
+								else {
+									printf("       ");
+								}
+							}
+							else {
+								printf("       ");
+							}
+						}
+						else {
+							//세로벽
+							if ((this->Path[i / 2][j / 2][3] == 0) && (this->Path[i / 2][j / 2 + 1][2] == 0)) {
+								//벽 존재
+								printf("|");
+								continue;
+							}
+							printf(" ");
+						}
 					}
-					else if (this->WallH[i / 6] & (1 << (j))) {
-						printf("-");
-					}
-					else { printf(" "); }
+					printf("|\n");
 				}
 			}
 			else {
-				//세로벽 설치
-				for (int j = 0; j < 53; j++) {
-					if ((j % 6) == 5) {
-						if (this->WallVt[i / 12] & (1 << (j / 12))) {
-							printf("|");
+				//홀수(가로벽 설치)
+				printf("|");
+				for (int j = 0; j < 9 + 8; j++) {
+					if (j % 2 == 0) {
+						//가로벽
+						if ((this->Path[i / 2][j / 2][1] == 0) && (this->Path[i / 2 + 1][(j / 2)][0] == 0)) {
+							//벽 존재
+							printf("-------");
+							continue;
 						}
-						else { printf(" "); }
+						printf("       ");
+
 					}
-					else { printf(" "); }
+					else {
+						//격자점
+						printf("+");
+
+					}
 				}
+				printf("|\n");
 			}
-			printf("|\n");
+
+
 		}
-		putchar('+'); for (int _ = 0; _ < 53; _++) { putchar('-'); }printf("+\n");
-
+		putchar('+'); for (int _ = 0; _ < 7 * 9 + 8; _++) { putchar('-'); }printf("+\n");
 	}
-
 	bool isLegalMove(uint8_t Move) {
 		//0b[플레이어/벽설치][가로/세로][행(3비트)][열(3비트)] 가로: 0, 세로: 1
 		//0b0[점프 유무][명령1(3비트)][명령2(3비트)] 점프시 1, 아니면 0
@@ -301,16 +331,24 @@ int AStar(Quoridor* Board) {
 
 int main() {
 	struct Quoridor Board;
-	uint8_t H[2] = { 0,0 };
-	uint8_t H2[2] = { 1,2 };
-	uint8_t V[2] = { 1,3 };
+	uint8_t H[2] = { 2,7 };
+	uint8_t H2[2] = { 0,2 };
+	uint8_t V[2] = { 1,7 };
 	uint8_t V2[2] = { 2,3 };
 	//uint8_t V[2] = { 3,4 };
 	Board.PlaceWallH(H);
-	Board.PlaceWallVt(V);
+	Board.PlaceWallV(V);
+	Board.PlaceWallH(H2);
+	Board.PlaceWallV(V2);
+	uint8_t GridWallPos[2] = { 0,0 };
+	for (int i = 0; i < 8; i++, GridWallPos[1]++) {
+		Board.PlaceWallH(GridWallPos);
+	}
 	//PlaceWallVt(&Board, V2);
 	printf("Distance: %d\n\n", AStar(&Board));
+	Board.PrintBoard();
 	/*
+
 		switch (Board.isLegalMove(0b11010011)) {
 	case false:
 		printf("0\n");
@@ -353,7 +391,7 @@ int main() {
 		printf("\n");
 	}
 
-	printf("\nWallV\n");
+	printf("\nWallVt\n");
 	for (int i = 0; i < 8; i++) {
 		for (int j = 0; j < 8; j++) {
 			if ((Board.WallVt[j] & (1 << i))) {
@@ -369,8 +407,6 @@ int main() {
 
 	//PrintBoard(Board);//쿼리도 보드 출력
 	//findLegalMoves(StartState, StartWallCount, false);//쿼리도 보드에서 합법적인 수 찾기
-
 	*/
-
 	return 0;
 }
