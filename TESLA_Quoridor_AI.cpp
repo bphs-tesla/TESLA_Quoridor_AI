@@ -37,6 +37,182 @@ struct Quoridor
 	uint8_t WallCount[2] = { 10,10 }; //P1,P2의 남은 벽 개수(10이 기본이고, 벽을 쓸수록 감소함)
 	bool isP1Turn = true; // P1의 차례이면, true, P2의 차례이면 false (P1이 선공이라서 true가 기본)
 
+	int PlaceWallH(uint8_t GridPos[2]) {
+		//가로로 벽을 배치하는 코드 ( k=0,1 )
+		//불가능하면 1 반환, 가능하면 0 반환
+		if ((GridPos[0] >= 8) || (GridPos[1] >= 8)) { return 1; } //유효하지 않은 좌표 예외 처리
+		if (isWall(GridPos)) { return 1; }
+		if ((this->WallH[GridPos[0]] | 1 << GridPos[1]) & (((this->WallH[GridPos[0]] | 1 << GridPos[1]) >> 1) | ((this->WallH[GridPos[0]] | 1 << GridPos[1]) << 1))) { return 1; }//인접한 곳에 벽이 있어 충돌판정
+		//Pos[0], Pos[1] - 1 위치의 가로 벽이 있는지 체크(없으면 이쪽 실행)
+		//Pos[0], Pos[1] + 1 위치의 가로 벽이 있는지 체크(없으면 이쪽 실행)
+		//벽 설치 코드
+		(this->WallH)[GridPos[0]] = (this->WallH)[GridPos[0]] | (1 << (GridPos[1])); //WallH 업데이트
+		//Path 업데이트
+		(this->Path)[GridPos[0] + 1][GridPos[1]][0] = false;
+		(this->Path)[GridPos[0] + 1][GridPos[1] + 1][0] = false;
+		(this->Path)[GridPos[0]][GridPos[1]][1] = false;
+		(this->Path)[GridPos[0]][GridPos[1] + 1][1] = false;
+		return 0; //정상적으로 Path & WallH 업데이트
+
+	}
+	//Quoridor 보드(의 메모리 주소)를 받아서 벽을 배치하는 함수
+	//WallVt는 전치되어서 t가 붙음
+	int PlaceWallVt(uint8_t GridPos[2]) {
+		//세로로 벽을 배치하는 코드 ( k=2,3 )
+		//불가능하면 1 반환, 가능하면 0 반환
+		if ((GridPos[0] >= 8) || (GridPos[1] >= 8)) { return 1; } //유효하지 않은 좌표 예외 처리
+		if (isWall(GridPos)) { return 1; }
+		if ((this->WallVt[GridPos[1]] | 1 << GridPos[0]) & (((this->WallVt[GridPos[1]] | 1 << GridPos[0]) >> 1) | ((this->WallVt[GridPos[1]] | 1 << GridPos[0]) << 1))) { return 1; }//인접한 곳에 벽이 있어 충돌판정
+		//Pos[0], Pos[1] +- 1 위치의 세로 벽이 있는지 체크(없으면 이쪽 실행)
+		//벽 설치 코드
+		(this->WallVt)[GridPos[1]] = (this->WallVt)[GridPos[1]] | (1 << (GridPos[0])); //WallVt 업데이트
+		//Path 업데이트
+		(this->Path)[GridPos[1]][GridPos[0] + 1][2] = false;
+		(this->Path)[GridPos[1] + 1][GridPos[0] + 1][2] = false;
+		(this->Path)[GridPos[1]][GridPos[0]][3] = false;
+		(this->Path)[GridPos[1] + 1][GridPos[0]][3] = false;
+		return 0; //정상적으로 Path & WallV 업데이트
+	}
+
+	bool isWall(uint8_t GridPos[2]) {
+		if ((this->WallVt)[GridPos[1]] & (1 << GridPos[0])) { return true; } //그 자리에 이미 벽이 존재
+		if ((this->WallH)[GridPos[0]] & (1 << GridPos[1])) { return true; } //그 자리에 이미 벽이 존재
+		return false;
+	}
+
+	bool isConnected() {
+		//GridPos에 벽을 설치하는것이 가능하다는 전제로 이 함수가 실행됨(체크 별도로 해야함)
+		return false;
+	}
+
+	//(지금은) 작동 안됨
+	void PrintBoard(){
+		//Quoridor를 받아서, 그에 대응되는 쿼리도 보드를 출력함
+		putchar('+'); for (int _ = 0; _ < 53; _++) { putchar('-'); }printf("+\n");
+
+		for (int i = 0; i < 35; i++) {
+			printf("|");
+			if ((i % 4) == 3) {
+				//가로벽 설치
+				for (int j = 0; j < 53; j++) {
+					if ((j % 6) == 5) {
+						printf("+");
+					}
+					else if (this->WallH[i / 6] & (1 << (j))) {
+						printf("-");
+					}
+					else { printf(" "); }
+				}
+			}
+			else {
+				//세로벽 설치
+				for (int j = 0; j < 53; j++) {
+					if ((j % 6) == 5) {
+						if (this->WallVt[i / 12] & (1 << (j / 12))) {
+							printf("|");
+						}
+						else { printf(" "); }
+					}
+					else { printf(" "); }
+				}
+			}
+			printf("|\n");
+		}
+		putchar('+'); for (int _ = 0; _ < 53; _++) { putchar('-'); }printf("+\n");
+
+	}
+
+	bool isLegalMove(uint8_t Move) {
+		//0b[플레이어/벽설치][가로/세로][행(3비트)][열(3비트)] 가로: 0, 세로: 1
+		//0b0[점프 유무][명령1(3비트)][명령2(3비트)] 점프시 1, 아니면 0
+		//0b1[가로/세로][행(3비트)][열(3비트)]
+		uint8_t MoveVariable[2];
+		MoveVariable[0] = (Move & (0b111 << 3)) >> 3;
+		MoveVariable[1] = Move & 0b111;
+		//MoveVariable은 Move에서 2개의 3비트 인수를 2개의 uint8_t 배열로 바꿔 저장한것임(안그러면 가독성이 너무 구려서)
+		switch (Move & (0b11 << 6)) {
+		case (0b00 << 6):
+			//0b00[명령1(3비트)][명령2(3비트)] 점프 X
+			/*상/하/좌/우 인지에 따라, 명령 1이 0 ~ 3까지를 표시한다*/
+			if (MoveVariable[0] > 3) { return false; } //정의되지 않은 범위
+			if (this->isP1Turn) {
+				//P1의 차례(P1이 이동할때)
+				if (this->Path[this->P1[0]][this->P1[1]][MoveVariable[0]]) {
+					//이동 가능
+					return true;
+				}
+			}
+			else {
+				//P2의 차례
+				if (this->Path[this->P2[0]][this->P2[1]][MoveVariable[0]]) {
+					//이동 가능
+					return true;
+				}
+				return false; //예외 처리(Path에 1이 존재하지 않음, 즉 벽에 가로막힘)
+		case (0b01 << 6):
+			//0b01[명령1(3비트)][명령2(3비트)] 점프 O
+			if (this->Path[this->P2[0]][this->P2[1]][MoveVariable[0]]) {
+				//이동 가능
+
+				return true;
+			}
+
+
+
+			break;
+		case (0b10 << 6):
+			//0b10[행(3비트)][열(3비트)] 가로 벽 설치
+			if ((this->WallH[MoveVariable[0]] | 1 << MoveVariable[1]) & (((this->WallH[MoveVariable[0]] | 1 << MoveVariable[1]) >> 1) | ((this->WallH[MoveVariable[0]] | 1 << MoveVariable[1]) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
+			return !isWall(MoveVariable); //가로 벽 설치 가능 여부 판단(bitshift때문에, 범위 판정은 안해도 됨)
+		case (0b11 << 6):
+			//0b11[행(3비트)][열(3비트)] 세로 벽 설치
+			if ((this->WallVt[MoveVariable[1]] | 1 << MoveVariable[0]) & (((this->WallVt[MoveVariable[1]] | 1 << MoveVariable[0]) >> 1) | ((this->WallVt[MoveVariable[1]] | 1 << MoveVariable[0]) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
+			return !isWall(MoveVariable); //세로 벽 설치 가능 여부 판단(bitshift때문에, 범위 판정은 안해도 됨)
+			}
+		}
+		return false; //어떻게 여기까지 올 수 있는지는 모르겠지만????? 만일을 위해서 예외 처리
+	}
+
+	int HeuristicEstimation(Quoridor* Board) {
+		/*
+		if (Board->isP1Turn) {
+			//P1의 차례
+		}
+		*/
+		return 0; //이거 원래 HeuristicEstimation은 보드의 상태(의 주소를 간접참조해) 보드의 상태를 평가하는 함수
+		/*재민이 화이팅 ㅎㅎ*/
+		/*
+
+		*/
+	}
+
+	int MakeChildNode(Quoridor* Board, int SearchTreeDepth) {
+		if (SearchTreeDepth <= 0) {
+			//탐색 깊이 최대 도달
+			return HeuristicEstimation(Board);
+		}
+		/*
+
+		마법
+
+		*/
+		//std::sort()
+		/*
+		어떤
+		*/
+
+
+		return 0;
+	}
+
+	std::vector<uint8_t> MakeLegalMoves(Quoridor Board) {
+		std::vector<uint8_t> LegalMoves; //동적으로 크기 설정 가능해서 vector<uint8_t> 이용했음
+		//0b[플레이어/벽설치][가로/세로][행(3비트)][열(3비트)]
+		//0b0[점프 유무][명령1(3비트)][명령2(3비트)] 점프시 1, 아니면 0
+		//0b1[가로/세로][행(3비트)][열(3비트)]
+
+		return LegalMoves;
+	}
 };
 
 struct AStar_Node {
@@ -50,58 +226,19 @@ struct AStar_Node {
 	}
 };
 
-
-
-//Quoridor 보드(의 메모리 주소)를 받아서 벽을 배치하는 함수
-//WallVt는 전치되어서 t가 붙음
-
-
-bool isWall(Quoridor* Board, uint8_t GridPos[2]) {
-	if ((Board->WallVt)[GridPos[1]] & (1 << GridPos[0])) { return true; } //그 자리에 이미 벽이 존재
-	if ((Board->WallH)[GridPos[0]] & (1 << GridPos[1])) { return true; } //그 자리에 이미 벽이 존재
-	return false;
-}
-
-bool isConnected(Quoridor* Board, uint8_t GridPos[2]) {
-	//GridPos에 벽을 설치하는것이 가능하다는 전제로 이 함수가 실행됨(체크 별도로 해야함)
-	return false;
-}
-
-
 ////////////////////////////////////////////////////////////////////
 
-int AStar(Quoridor* Board) {
-	std::priority_queue<AStar_Node> AStar_Nodes; //열린 리스트 선언
-	std::vector<std::array<uint8_t, 2>> AStar_ClosedNodes; //닫힌 리스트 선언(닫힌 리스트는 비용 고려를 할 필요가 없으니, 벡터 행렬로 압축
-	int Destination = Board->isP1Turn ? 0 : 8; // 목적지 설정
-	struct AStar_Node RootNode;
-	RootNode.Position[0] = Board->isP1Turn ? Board->P1[0] : Board->P2[0]; // 루트 노드 위치 (플레이어의 위치)
-	RootNode.Position[1] = Board->isP1Turn ? Board->P1[1] : Board->P2[1];
-
-	RootNode.HeuristicCost = AStar_HeuristicCost(&RootNode, Destination); //루트 노드 휴리스틱
-	RootNode.AccumulatedCost = 0; //루트 노드라서 누적 비용 = 0
-
-	int Distance;
-	while (!AStar_Nodes.empty()) {
-		//AStar_Nodes에 원소 존재
-		Distance = AStar_MakeChildNode(Board, &AStar_Nodes, &AStar_ClosedNodes, Destination);
-		if (Distance) {
-			// 목적지 도달하는 자식노드 발견
-			return Distance;
-		}
-	}
-	return 0;//목적지로 가는 경로 존재 X
+inline int AStar_HeuristicCost(AStar_Node* Node, int Destination) {
+	//휴리스틱비용
+	//return (Board->isP1Turn ? 0 : 8) > PlayerPos[0] ? (Board->isP1Turn ? 0 : 8) - PlayerPos[0] : PlayerPos[0] - (Board->isP1Turn ? 0 : 8);
+	return abs(Destination - Node->Position[0]);
 }
 
-int AStar_MakeChildNode(
+int AStar_MakeChildNode(Quoridor* Board, std::priority_queue<AStar_Node>* AStar_Nodes, std::vector<std::array<uint8_t, 2>>* AStar_ClosedNodes, int Destination) {
 	/*
 	자식 노드를 비용이 최소인 부모 노드를 기반으로 만들고, 부모 노드를 닫힌 리스트로 이동시키는 함수
 	자식 생성후, 그 노드가 목표가 아니면 0, 목표라면 출발-도착지까지의 거리 반환
 	*/
-	Quoridor* Board,
-	std::priority_queue<AStar_Node>* AStar_Nodes,
-	std::vector<std::array<uint8_t, 2>>* AStar_ClosedNodes,
-	int Destination) {
 	//Parent의 노드를 받고, 그 상태에서 이동 가능한 경로 탐색 후 자식 노드 생성
 
 	//f = 비용g(n) + 휴리스틱h(n)
@@ -130,247 +267,34 @@ int AStar_MakeChildNode(
 	return 0;
 }
 
-inline int AStar_HeuristicCost(AStar_Node* Node, int Destination) {
-	//휴리스틱비용
-	//return (Board->isP1Turn ? 0 : 8) > PlayerPos[0] ? (Board->isP1Turn ? 0 : 8) - PlayerPos[0] : PlayerPos[0] - (Board->isP1Turn ? 0 : 8);
-	return abs(Destination - Node->Position[0]);
-}
-
-/*
-int AStar(Quoridor* Board, std::vector<uint8_t>* Path) {
-	//uint8_t Destination = Board->isP1Turn ? 0 : 8; // 목적지 설정
-	//P1 검사
-	//f = 비용g(n) + 휴리스틱h(n)
-	std::priority_queue<std::pair<int, std::array<uint8_t, 2>>, std::greater<int>> AStar_Nodes(); //오름차순으로 정렬 > 비용이 최소인 노드가 top()
-	std::vector<std::array<uint8_t, 2>> AStar_ClosedNodes;
-
-	std::pair<int, std::array<uint8_t, 2>> RootNode;
-
-	RootNode.second[0] = (Board->isP1Turn) ? Board->P1[0] : Board->P2[0];
-	RootNode.second[1] = (Board->isP1Turn) ? Board->P1[1] : Board->P2[1];
-
-
-	AStar_Nodes는 <f(총 비용), 쿼리도 보드에서의 위치(Pos[2])> 라는 페어를 담은 priority queue이다.
-	이 방식으로, 나중에 std::sort나 priority queue를 사용하기 쉬워진다.
-	자식 노드 생성시, 위의 AStar_Nodes에 std::pair를 push()하고, 다음 경로를 선택하는 것은 AStar_Nodes에서 pop()하는 동작으로 구현이 가능하다.
-
-	AStar_MakeChildNode(Board, );
-
-
-	for (int i = 0; i < 4; i++) {
-
-	}
-	return 0;
-
-}
-*/
-
-
-/*
-int AStar_MakeChildNode(
-	Quoridor* Board,
-	std::priority_queue<std::pair<int, std::array<uint8_t, 2>>>* AStar_Nodes,
-	std::vector<std::array<uint8_t, 2>>* AStar_ClosedNodes
-	) {
-	//f = 비용g(n) + 휴리스틱h(n)
-	std::pair<int, std::array<uint8_t, 2>> ParentNode; //부모 노드
-	std::pair<int, std::array<uint8_t, 2>> ChildNode = ParentNode; //자식 노드
-
-	ParentNode = AStar_Nodes->top(); //부모 노드 선택
-	AStar_ClosedNodes->emplace()
-	AStar_Nodes->pop();
-
-	for (int i = 0; i < 4; i++) {
-		if (Board->Path[ParentNode.second[0]][ParentNode.second[1]][i]) {
-			//이동 가능한 수인지 확인
-			ChildNode.second[i / 2] += ((i % 2) == 0) ? -1 : 1; //상하좌우에 따라 ChildNode의 위치를 +-1(이동)
-			if (std::find(AStar_ClosedNodes->begin(),AStar_ClosedNodes->end(), ChildNode.second) != AStar_ClosedNodes->end()) {
-				//AStar_ClosedNodes에 존재하지 않음(새로운 노드 >> 자식 생성)
-				ChildNode.first = AStar_HeuristicCost(Board, ChildNode.second.data()) + AStar_AccumulatedCost(Board, ChildNode.second.data());
-				AStar_Nodes->push(ChildNode);
-			}
-		}
-	}
-
-	//ParentNode.first = AStar_HeuristicCost(Board, ParentNode.second.data()) + AStar_AccumulatedCost(Board, ParentNode.second.data());
-	return 0;
-}
-*/
-
-// AStar
-//하나의 존나 큰 상태 힙 생성 > 
-
-
-//////////////////////////////////////////////////////////////////////
-
-
-int PlaceWallH(Quoridor* Board, uint8_t GridPos[2]) {
-	//가로로 벽을 배치하는 코드 ( k=0,1 )
-	//불가능하면 1 반환, 가능하면 0 반환
-	if ((GridPos[0] >= 8) || (GridPos[1] >= 8)) { return 1; } //유효하지 않은 좌표 예외 처리
-	if (isWall(Board, GridPos)) { return 1; }
-	if ((Board->WallH[GridPos[0]] | 1 << GridPos[1]) & (((Board->WallH[GridPos[0]] | 1 << GridPos[1]) >> 1) | ((Board->WallH[GridPos[0]] | 1 << GridPos[1]) << 1))) { return 1; }//인접한 곳에 벽이 있어 충돌판정
-	//Pos[0], Pos[1] - 1 위치의 가로 벽이 있는지 체크(없으면 이쪽 실행)
-	//Pos[0], Pos[1] + 1 위치의 가로 벽이 있는지 체크(없으면 이쪽 실행)
-	//벽 설치 코드
-	(Board->WallH)[GridPos[0]] = (Board->WallH)[GridPos[0]] | (1 << (GridPos[1])); //WallH 업데이트
-	//Path 업데이트
-	(Board->Path)[GridPos[0] + 1][GridPos[1]][0] = false;
-	(Board->Path)[GridPos[0] + 1][GridPos[1] + 1][0] = false;
-	(Board->Path)[GridPos[0]][GridPos[1]][1] = false;
-	(Board->Path)[GridPos[0]][GridPos[1] + 1][1] = false;
-	return 0; //정상적으로 Path & WallH 업데이트
-
-}
-
-int PlaceWallVt(Quoridor* Board, uint8_t GridPos[2]) {
-	//세로로 벽을 배치하는 코드 ( k=2,3 )
-	//불가능하면 1 반환, 가능하면 0 반환
-	if ((GridPos[0] >= 8) || (GridPos[1] >= 8)) { return 1; } //유효하지 않은 좌표 예외 처리
-	if (isWall(Board, GridPos)) { return 1; }
-	if ((Board->WallVt[GridPos[1]] | 1 << GridPos[0]) & (((Board->WallVt[GridPos[1]] | 1 << GridPos[0]) >> 1) | ((Board->WallVt[GridPos[1]] | 1 << GridPos[0]) << 1))) { return 1; }//인접한 곳에 벽이 있어 충돌판정
-	//Pos[0], Pos[1] +- 1 위치의 세로 벽이 있는지 체크(없으면 이쪽 실행)
-	//벽 설치 코드
-	(Board->WallVt)[GridPos[1]] = (Board->WallVt)[GridPos[1]] | (1 << (GridPos[0])); //WallVt 업데이트
-	//Path 업데이트
-	(Board->Path)[GridPos[1]][GridPos[0] + 1][2] = false;
-	(Board->Path)[GridPos[1] + 1][GridPos[0] + 1][2] = false;
-	(Board->Path)[GridPos[1]][GridPos[0]][3] = false;
-	(Board->Path)[GridPos[1] + 1][GridPos[0]][3] = false;
-	return 0; //정상적으로 Path & WallV 업데이트
-
-}
-
-//(지금은) 작동 안됨
-void PrintBoard(struct Quoridor Board) {
-	//Quoridor를 받아서, 그에 대응되는 쿼리도 보드를 출력함
-	putchar('+'); for (int _ = 0; _ < 53; _++) { putchar('-'); }printf("+\n");
-
-	for (int i = 0; i < 35; i++) {
-		printf("|");
-		if ((i % 4) == 3) {
-			 //가로벽 설치
-			for (int j = 0; j < 53; j++) {
-				if ((j % 6) == 5) {
-					printf("+");
-				}
-				else if (Board.WallH[i / 6] & (1 << (j))) {
-					printf("-");
-				}
-				else { printf(" "); }
-			}
-		}
-		else {
-			//세로벽 설치
-			for (int j = 0; j < 53; j++) {
-				if ((j % 6) == 5) {
-					if (Board.WallVt[i / 12] & (1 << (j / 12))) {
-						printf("|");
-					}
-					else { printf(" "); }
-				}else { printf(" "); }
-			}
-		}
-		printf("|\n");
-	}
-	putchar('+'); for (int _ = 0; _ < 53; _++) { putchar('-'); }printf("+\n");
-
-}
-
-
-std::vector<uint8_t> MakeLegalMoves(Quoridor Board) {
-	std::vector<uint8_t> LegalMoves; //동적으로 크기 설정 가능해서 vector<uint8_t> 이용했음
-	//0b[플레이어/벽설치][가로/세로][행(3비트)][열(3비트)]
-	//0b0[점프 유무][명령1(3비트)][명령2(3비트)] 점프시 1, 아니면 0
-	//0b1[가로/세로][행(3비트)][열(3비트)]
-
-	return LegalMoves;
-}
-
-bool isLegalMove(Quoridor* Board, uint8_t Move) {
-	//0b[플레이어/벽설치][가로/세로][행(3비트)][열(3비트)] 가로: 0, 세로: 1
-	//0b0[점프 유무][명령1(3비트)][명령2(3비트)] 점프시 1, 아니면 0
-	//0b1[가로/세로][행(3비트)][열(3비트)]
-	uint8_t MoveVariable[2];
-	MoveVariable[0] = (Move & (0b111 << 3)) >> 3;
-	MoveVariable[1] = Move & 0b111;
-	//MoveVariable은 Move에서 2개의 3비트 인수를 2개의 uint8_t 배열로 바꿔 저장한것임(안그러면 가독성이 너무 구려서)
-	switch (Move & (0b11 << 6)) {
-	case (0b00 << 6):
-		//0b00[명령1(3비트)][명령2(3비트)] 점프 X
-		/*상/하/좌/우 인지에 따라, 명령 1이 0 ~ 3까지를 표시한다*/
-		if (MoveVariable[0] > 3) { return false; } //정의되지 않은 범위
-		if (Board->isP1Turn) {
-			//P1의 차례(P1이 이동할때)
-			if (Board->Path[Board->P1[0]][Board->P1[1]][MoveVariable[0]]) {
-				//이동 가능
-				return true;
-			}
-		}
-		else {
-			//P2의 차례
-			if (Board->Path[Board->P2[0]][Board->P2[1]][MoveVariable[0]]) {
-				//이동 가능
-				return true;
-			}
-			return false; //예외 처리(Path에 1이 존재하지 않음, 즉 벽에 가로막힘)
-	case (0b01 << 6):
-		//0b01[명령1(3비트)][명령2(3비트)] 점프 O
-		if (Board->Path[Board->P2[0]][Board->P2[1]][MoveVariable[0]]) {
-			//이동 가능
-
-			return true;
-		}
-
-
-
-		break;
-	case (0b10 << 6):
-		//0b10[행(3비트)][열(3비트)] 가로 벽 설치
-		if ((Board->WallH[MoveVariable[0]] | 1 << MoveVariable[1]) & (((Board->WallH[MoveVariable[0]] | 1 << MoveVariable[1]) >> 1) | ((Board->WallH[MoveVariable[0]] | 1 << MoveVariable[1]) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
-		return !isWall(Board, MoveVariable); //가로 벽 설치 가능 여부 판단(bitshift때문에, 범위 판정은 안해도 됨)
-	case (0b11 << 6):
-		//0b11[행(3비트)][열(3비트)] 세로 벽 설치
-		if ((Board->WallVt[MoveVariable[1]] | 1 << MoveVariable[0]) & (((Board->WallVt[MoveVariable[1]] | 1 << MoveVariable[0]) >> 1) | ((Board->WallVt[MoveVariable[1]] | 1 << MoveVariable[0]) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
-		return !isWall(Board, MoveVariable); //세로 벽 설치 가능 여부 판단(bitshift때문에, 범위 판정은 안해도 됨)
-		}
-		return false; //어떻게 여기까지 올 수 있는지는 모르겠지만????? 만일을 위해서 예외 처리
-	}
-}
-
-int HeuristicEstimation(Quoridor* Board) {
-		/*
-		if (Board->isP1Turn) {
-			//P1의 차례
-		}
-		*/
-		return 0; //이거 원래 HeuristicEstimation은 보드의 상태(의 주소를 간접참조해) 보드의 상태를 평가하는 함수
-		/*재민이 화이팅 ㅎㅎ*/
-		/*
-
-		*/
-	}
-
-int MakeChildNode(Quoridor* Board, int SearchTreeDepth) {
-	if (SearchTreeDepth <= 0) {
-		//탐색 깊이 최대 도달
-		return HeuristicEstimation(Board);
-	}
-
-
+int AStar(Quoridor* Board) {
 	/*
-	
-	마법
-
-	*/
-	//std::sort()
-	/*
-	어떤 
+	지금 차례의 플레이어가 목적지로 갈때까지의 거리 반환
+	목적지로 도달하는 것이 불가능하다면, 0 반환
 	*/
 	
+	std::priority_queue<AStar_Node> AStar_Nodes; //열린 리스트 선언
+	std::vector<std::array<uint8_t, 2>> AStar_ClosedNodes; //닫힌 리스트 선언(닫힌 리스트는 비용 고려를 할 필요가 없으니, 벡터 행렬로 압축
+	int Destination = Board->isP1Turn ? 0 : 8; // 목적지 설정
+	struct AStar_Node RootNode = { 0, };
+	RootNode.Position[0] = Board->isP1Turn ? Board->P1[0] : Board->P2[0]; // 루트 노드 위치 (플레이어의 위치)
+	RootNode.Position[1] = Board->isP1Turn ? Board->P1[1] : Board->P2[1];
 
-	return 0;
+	RootNode.HeuristicCost = AStar_HeuristicCost(&RootNode, Destination); //루트 노드 휴리스틱
+	RootNode.AccumulatedCost = 0; //루트 노드라서 누적 비용 = 0
+
+	int Distance;
+	while (!AStar_Nodes.empty()) {
+		//AStar_Nodes에 원소 존재
+		Distance = AStar_MakeChildNode(Board, &AStar_Nodes, &AStar_ClosedNodes, Destination);
+		if (Distance) {
+			// 목적지 도달하는 자식노드 발견
+			return Distance;
+		}
+	}
+	return 0;//목적지로 가는 경로 존재 X
 }
+
 
 
 int main() {
@@ -380,11 +304,11 @@ int main() {
 	uint8_t V[2] = { 1,3 };
 	uint8_t V2[2] = { 2,3 };
 	//uint8_t V[2] = { 3,4 };
-	PlaceWallH(&Board, H);
-	PlaceWallVt(&Board, V);
+	Board.PlaceWallH(H);
+	Board.PlaceWallVt(V);
 	//PlaceWallVt(&Board, V2);
 	
-	switch (isLegalMove(&Board, 0b11010011)) {
+	switch (Board.isLegalMove(0b11010011)) {
 	case false:
 		printf("0\n");
 		break;
@@ -441,11 +365,6 @@ int main() {
 		}
 		printf("\n");
 	}
-
-	
-
-
-
 	//printf("Path Size: %d", (int)sizeof(Board.Path));
 
 	//PrintBoard(Board);//쿼리도 보드 출력
