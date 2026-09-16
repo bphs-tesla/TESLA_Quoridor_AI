@@ -3,7 +3,7 @@ project(TESLA_Quoridor_AI)
 
 # pybind11 패키지 찾기
 set(pybind11_DIR
-    "C:/Users/yujoo/Desktop/TESLA/TESLA_Quoridor_AI/.venv/Lib/site-packages/pybind11/share/cmake/pybind11"
+    "../TESLA_Quoridor_AI/.venv/Lib/site-packages/pybind11/share/cmake/pybind11"
 )
 
 find_package(pybind11 REQUIRED)

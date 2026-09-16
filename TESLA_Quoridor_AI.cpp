@@ -123,97 +123,99 @@ bool isConnected(Quoridor* Board) {
 	return false;
 }
 
-bool isLegalMove(Quoridor* Board, uint8_t Move) {
-	//0b[플레이어/벽설치][가로/세로][행(3비트)][열(3비트)] 가로: 0, 세로: 1
-	//0b0[점프 유무][명령1(3비트)][명령2(3비트)] 점프시 1, 아니면 0
-	//0b1[가로/세로][행(3비트)][열(3비트)]
-	std::array<uint8_t, 2> MoveVariable;
-	MoveVariable.at(0) = (Move & (0b111 << 3)) >> 3;
-	MoveVariable.at(1) = Move & 0b111;
-	//MoveVariable은 Move에서 2개의 3비트 인수를 2개의 uint8_t 배열로 바꿔 저장한것임(안그러면 가독성이 너무 구려서)
-	switch (Move & (0b11 << 6)) {
-	case (0b00 << 6):
-		//0b00[명령1(3비트)][명령2(3비트)] 점프 X
-		/*상/하/좌/우 인지에 따라, 명령 1이 0 ~ 3까지를 표시한다*/
-		if (MoveVariable[0] > 3) { return false; } //정의되지 않은 범위
-		if (Board->isP1Turn) {
-			//P1의 차례(P1이 이동할때)
-			if (Board->Path[Board->P1[0]][Board->P1[1]][MoveVariable.at(0)]) {
-				//이동 가능
-				return true;
-			}
-		}
-		else {
-			//P2의 차례
-			if (Board->Path[Board->P2[0]][Board->P2[1]][MoveVariable.at(0)]) {
-				//이동 가능
-				return true;
-			}
-			return false; //예외 처리(Path에 1이 존재하지 않음, 즉 벽에 가로막힘)
-	case (0b01 << 6):
-		//0b01[명령1(3비트)][명령2(3비트)] 점프 O
-		if (Board->Path[Board->P2[0]][Board->P2[1]][MoveVariable.at(0)]) {
-			//이동 가능
-
-			return true;
-		}
 
 
-
-		break;
-	case (0b10 << 6):
-		//0b10[행(3비트)][열(3비트)] 가로 벽 설치
-		if ((Board->WallH[MoveVariable.at(0)] | 1 << MoveVariable.at(1)) & (((Board->WallH[MoveVariable.at(0)] | 1 << MoveVariable.at(1)) >> 1) | ((Board->WallH[MoveVariable.at(0)] | 1 << MoveVariable.at(1)) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
-		return !isWall(Board, &MoveVariable); //가로 벽 설치 가능 여부 판단(bitshift때문에, 범위 판정은 안해도 됨)
-	case (0b11 << 6):
-		//0b11[행(3비트)][열(3비트)] 세로 벽 설치
-		if ((Board->WallVt[MoveVariable.at(1)] | 1 << MoveVariable.at(0)) & (((Board->WallVt[MoveVariable.at(1)] | 1 << MoveVariable.at(0)) >> 1) | ((Board->WallVt[MoveVariable.at(1)] | 1 << MoveVariable.at(0)) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
-		return !isWall(Board, &MoveVariable); //세로 벽 설치 가능 여부 판단(bitshift때문에, 범위 판정은 안해도 됨)
-		}
-	}
-	return false; //어떻게 여기까지 올 수 있는지는 모르겠지만????? 만일을 위해서 예외 처리
-}
-
-int HeuristicEstimation(Quoridor* Board) {
-	/*
-	if (Board->isP1Turn) {
-		//P1의 차례
-	}
-	*/
-	return 0; //이거 원래 HeuristicEstimation은 보드의 상태(의 주소를 간접참조해) 보드의 상태를 평가하는 함수
-	/*재민이 화이팅 ㅎㅎ*/
-	/*
-
-	*/
-}
-
-int MakeChildNode(Quoridor* Board, int SearchTreeDepth) {
-	if (SearchTreeDepth <= 0) {
-		//탐색 깊이 최대 도달
-		return HeuristicEstimation(Board);
-	}
-	/*
-
-	마법
-
-	*/
-	//std::sort()
-	/*
-	어떤
-	*/
-
-
-	return 0;
-}
-
-std::vector<uint8_t> MakeLegalMoves(Quoridor* Board) {
-	std::vector<uint8_t> LegalMoves; //동적으로 크기 설정 가능해서 vector<uint8_t> 이용했음
-	//0b[플레이어/벽설치][가로/세로][행(3비트)][열(3비트)]
-	//0b0[점프 유무][명령1(3비트)][명령2(3비트)] 점프시 1, 아니면 0
-	//0b1[가로/세로][행(3비트)][열(3비트)]
-
-	return LegalMoves;
-}
+//bool isLegalMove(Quoridor* Board, uint8_t Move) {
+//	//0b[플레이어/벽설치][가로/세로][행(3비트)][열(3비트)] 가로: 0, 세로: 1
+//	//0b0[점프 유무][명령1(3비트)][명령2(3비트)] 점프시 1, 아니면 0
+//	//0b1[가로/세로][행(3비트)][열(3비트)]
+//	std::array<uint8_t, 2> MoveVariable;
+//	MoveVariable.at(0) = (Move & (0b111 << 3)) >> 3;
+//	MoveVariable.at(1) = Move & 0b111;
+//	//MoveVariable은 Move에서 2개의 3비트 인수를 2개의 uint8_t 배열로 바꿔 저장한것임(안그러면 가독성이 너무 구려서)
+//	switch (Move & (0b11 << 6)) {
+//	case (0b00 << 6):
+//		//0b00[명령1(3비트)][명령2(3비트)] 점프 X
+//		/*상/하/좌/우 인지에 따라, 명령 1이 0 ~ 3까지를 표시한다*/
+//		if (MoveVariable[0] > 3) { return false; } //정의되지 않은 범위
+//		if (Board->isP1Turn) {
+//			//P1의 차례(P1이 이동할때)
+//			if (Board->Path[Board->P1[0]][Board->P1[1]][MoveVariable.at(0)]) {
+//				//이동 가능
+//				return true;
+//			}
+//		}
+//		else {
+//			//P2의 차례
+//			if (Board->Path[Board->P2[0]][Board->P2[1]][MoveVariable.at(0)]) {
+//				//이동 가능
+//				return true;
+//			}
+//			return false; //예외 처리(Path에 1이 존재하지 않음, 즉 벽에 가로막힘)
+//	case (0b01 << 6):
+//		//0b01[명령1(3비트)][명령2(3비트)] 점프 O
+//		if (Board->Path[Board->P2[0]][Board->P2[1]][MoveVariable.at(0)]) {
+//			//이동 가능
+//
+//			return true;
+//		}
+//
+//
+//
+//		break;
+//	case (0b10 << 6):
+//		//0b10[행(3비트)][열(3비트)] 가로 벽 설치
+//		if ((Board->WallH[MoveVariable.at(0)] | 1 << MoveVariable.at(1)) & (((Board->WallH[MoveVariable.at(0)] | 1 << MoveVariable.at(1)) >> 1) | ((Board->WallH[MoveVariable.at(0)] | 1 << MoveVariable.at(1)) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
+//		return !isWall(Board, &MoveVariable); //가로 벽 설치 가능 여부 판단(bitshift때문에, 범위 판정은 안해도 됨)
+//	case (0b11 << 6):
+//		//0b11[행(3비트)][열(3비트)] 세로 벽 설치
+//		if ((Board->WallVt[MoveVariable.at(1)] | 1 << MoveVariable.at(0)) & (((Board->WallVt[MoveVariable.at(1)] | 1 << MoveVariable.at(0)) >> 1) | ((Board->WallVt[MoveVariable.at(1)] | 1 << MoveVariable.at(0)) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
+//		return !isWall(Board, &MoveVariable); //세로 벽 설치 가능 여부 판단(bitshift때문에, 범위 판정은 안해도 됨)
+//		}
+//	}
+//	return false; //어떻게 여기까지 올 수 있는지는 모르겠지만????? 만일을 위해서 예외 처리
+//}
+//
+//int HeuristicEstimation(Quoridor* Board) {
+//	/*
+//	if (Board->isP1Turn) {
+//		//P1의 차례
+//	}
+//	*/
+//	return 0; //이거 원래 HeuristicEstimation은 보드의 상태(의 주소를 간접참조해) 보드의 상태를 평가하는 함수
+//	/*재민이 화이팅 ㅎㅎ*/
+//	/*
+//
+//	*/
+//}
+//
+//int MakeChildNode(Quoridor* Board, int SearchTreeDepth) {
+//	if (SearchTreeDepth <= 0) {
+//		//탐색 깊이 최대 도달
+//		return HeuristicEstimation(Board);
+//	}
+//	/*
+//
+//	마법
+//
+//	*/
+//	//std::sort()
+//	/*
+//	어떤
+//	*/
+//
+//
+//	return 0;
+//}
+//
+//std::vector<uint8_t> MakeLegalMoves(Quoridor* Board) {
+//	std::vector<uint8_t> LegalMoves; //동적으로 크기 설정 가능해서 vector<uint8_t> 이용했음
+//	//0b[플레이어/벽설치][가로/세로][행(3비트)][열(3비트)]
+//	//0b0[점프 유무][명령1(3비트)][명령2(3비트)] 점프시 1, 아니면 0
+//	//0b1[가로/세로][행(3비트)][열(3비트)]
+//
+//	return LegalMoves;
+//}
 
 int PlaceWallH(Quoridor* Board, std::array<uint8_t, 2> GridPos[2]) {
 	//가로로 벽을 배치하는 코드 ( k=0,1 )
@@ -345,9 +347,9 @@ int main() {
 	std::array<uint8_t, 2>  V2 = { 2,3 };
 	//uint8_t V[2] = { 3,4 };
 	//Board.PlaceWallH(&H);
-	PlaceWallV(&Board, &V);
-	PlaceWallH(&Board, &H2);
-	PlaceWallV(&Board, &V2);
+	//PlaceWallV(&Board, &V);
+	//PlaceWallH(&Board, &H2);
+	//PlaceWallV(&Board, &V2);
 	std::array<uint8_t, 2> GridWallPos = { 0,0 };
 	for (int i = 0; i < 8; i++, GridWallPos.at(1)++) {
 		PlaceWallH(&Board, &GridWallPos);
@@ -420,16 +422,7 @@ int main() {
 }
 
 
-int add(int i, int j) {
-	return i + j;
-}
-
-PYBIND11_MODULE(example, m) {
-	m.doc() = "pybind11 example plugin"; // optional module docstring
-
-	m.def("add", &add, "A function that adds two numbers");
-}
-
+//pybind11 모듈 바인딩
 PYBIND11_MODULE(Quoridor, m) {
 	m.doc() = "Quoridor Cpp library";
 	pybind11::class_<Quoridor>(m, "Quoridor")
@@ -446,4 +439,5 @@ PYBIND11_MODULE(Quoridor, m) {
 	m.def("PlaceWallH", &PlaceWallH, "places horizontal wall");
 	m.def("PlaceWallV", &PlaceWallV, "places vertical wall");
 	m.def("PrintBoard", &Quoridor::PrintBoard, "prints current Board");
+	m.def("AStar_Distance". &AStar, "finds the shortest distance between ")
 }
