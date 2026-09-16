@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\yujoo\Desktop\TESLA\TESLA_Quoridor_AI\build\CMakeFiles\d94ad740b11cdc9d02cdbad314b20abc\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{935D0D4A-1CD7-3563-A6F3-183D95ECB46C}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

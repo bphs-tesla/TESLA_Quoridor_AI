@@ -1,0 +1,480 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Debug-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.12"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "TESLA_Quoridor_AI",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "ALL_BUILD::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ALL_BUILD-Debug-74c08caf5c6108df55c3.json",
+					"name" : "ALL_BUILD",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "PlaceWallH::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PlaceWallH-Debug-a90d9cf94f483b627628.json",
+					"name" : "PlaceWallH",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "PlaceWallV::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PlaceWallV-Debug-d69db2e2f7bb45df6dbc.json",
+					"name" : "PlaceWallV",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "PrintBoard::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PrintBoard-Debug-b7849a9edc725b14775d.json",
+					"name" : "PrintBoard",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "Quoridor::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Quoridor-Debug-f11da49e63509b2fed3f.json",
+					"name" : "Quoridor",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "TESTfunc::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-TESTfunc-Debug-a948e58a26c10d419bd4.json",
+					"name" : "TESTfunc",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ZERO_CHECK::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ZERO_CHECK-Debug-cca9befd3be3de0c7a8a.json",
+					"name" : "ZERO_CHECK",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "example::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-example-Debug-e3628cf59ee84b4c2405.json",
+					"name" : "example",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "isWall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-isWall-Debug-9291624dd08c399e3b9d.json",
+					"name" : "isWall",
+					"projectIndex" : 0
+				}
+			]
+		},
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Release-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.12"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8
+					]
+				}
+			],
+			"name" : "Release",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "TESLA_Quoridor_AI",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "ALL_BUILD::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ALL_BUILD-Release-74c08caf5c6108df55c3.json",
+					"name" : "ALL_BUILD",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "PlaceWallH::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PlaceWallH-Release-f9fb93007f5143f15475.json",
+					"name" : "PlaceWallH",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "PlaceWallV::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PlaceWallV-Release-b86197fb126e219051ca.json",
+					"name" : "PlaceWallV",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "PrintBoard::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PrintBoard-Release-2b1a74b958b74dd7e539.json",
+					"name" : "PrintBoard",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "Quoridor::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Quoridor-Release-dcebc45875f7122e6450.json",
+					"name" : "Quoridor",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "TESTfunc::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-TESTfunc-Release-5e95924ce1b66f81c6fc.json",
+					"name" : "TESTfunc",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ZERO_CHECK::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ZERO_CHECK-Release-cca9befd3be3de0c7a8a.json",
+					"name" : "ZERO_CHECK",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "example::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-example-Release-a21227448ed5e84ff930.json",
+					"name" : "example",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "isWall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-isWall-Release-92e70efce5ea56b0e18b.json",
+					"name" : "isWall",
+					"projectIndex" : 0
+				}
+			]
+		},
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-MinSizeRel-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.12"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8
+					]
+				}
+			],
+			"name" : "MinSizeRel",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "TESLA_Quoridor_AI",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "ALL_BUILD::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ALL_BUILD-MinSizeRel-74c08caf5c6108df55c3.json",
+					"name" : "ALL_BUILD",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "PlaceWallH::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PlaceWallH-MinSizeRel-4d2a030a36e25883bad0.json",
+					"name" : "PlaceWallH",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "PlaceWallV::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PlaceWallV-MinSizeRel-7c56eb1b4e415350189d.json",
+					"name" : "PlaceWallV",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "PrintBoard::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PrintBoard-MinSizeRel-0010e6762d932364e91a.json",
+					"name" : "PrintBoard",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "Quoridor::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Quoridor-MinSizeRel-6070855a132a2ba868f5.json",
+					"name" : "Quoridor",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "TESTfunc::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-TESTfunc-MinSizeRel-e37c08ce08ad96c25cab.json",
+					"name" : "TESTfunc",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ZERO_CHECK::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ZERO_CHECK-MinSizeRel-cca9befd3be3de0c7a8a.json",
+					"name" : "ZERO_CHECK",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "example::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-example-MinSizeRel-c682106a3a026e1bc0e0.json",
+					"name" : "example",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "isWall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-isWall-MinSizeRel-9cd2e9ef6a3454d1d96d.json",
+					"name" : "isWall",
+					"projectIndex" : 0
+				}
+			]
+		},
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-RelWithDebInfo-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.12"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8
+					]
+				}
+			],
+			"name" : "RelWithDebInfo",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "TESLA_Quoridor_AI",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "ALL_BUILD::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ALL_BUILD-RelWithDebInfo-74c08caf5c6108df55c3.json",
+					"name" : "ALL_BUILD",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "PlaceWallH::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PlaceWallH-RelWithDebInfo-06f21b489243b248a25f.json",
+					"name" : "PlaceWallH",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "PlaceWallV::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PlaceWallV-RelWithDebInfo-7c3854d0d3f261c07f7d.json",
+					"name" : "PlaceWallV",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "PrintBoard::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PrintBoard-RelWithDebInfo-193fa9294f0bab2f2d4a.json",
+					"name" : "PrintBoard",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "Quoridor::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Quoridor-RelWithDebInfo-fc3bd3c39075a3f43195.json",
+					"name" : "Quoridor",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "TESTfunc::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-TESTfunc-RelWithDebInfo-6a1db18b4b407d7b404d.json",
+					"name" : "TESTfunc",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ZERO_CHECK::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ZERO_CHECK-RelWithDebInfo-cca9befd3be3de0c7a8a.json",
+					"name" : "ZERO_CHECK",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "example::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-example-RelWithDebInfo-b6ce2aecd24e0cfdccf2.json",
+					"name" : "example",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "isWall::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-isWall-RelWithDebInfo-6e36996d10bd22ecc401.json",
+					"name" : "isWall",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "C:/Users/yujoo/Desktop/TESLA/TESLA_Quoridor_AI/build",
+		"source" : "C:/Users/yujoo/Desktop/TESLA/TESLA_Quoridor_AI"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 4
+	}
+}

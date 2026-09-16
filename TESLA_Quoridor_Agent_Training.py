@@ -14,17 +14,25 @@ import gymnasium as gym
 import pybind11
 import sys
 sys.path.append('../TESLA_Quoridor_AI/build/Debug')  # Add the path to TESLA_Quoridor_AI module
+#C:\Users\yujoo\Desktop\TESLA\TESLA_Quoridor_AI\build\Debug
 #C:\Users\yujoo\Desktop\TESLA\TESLA_Quoridor_AI
 import example  # Import the C++ module
-import QuoridorGame  # Import the C++ module
+#print(Quoridor("Board"))
 
-print(QuoridorGame.Quoridor("Board"))
+import Quoridor
 
+Board = Quoridor.Quoridor()
+Board.PrintBoard()
+
+print(Board.P1)
+print(Board.P2)
+print(Board.WallCount)
+print(Board.isP1Turn)
 # Call the initialize_game function from the C++ module
 
 
 
-print(example.add(3, 4))  # Call the add function from the C++ module
+#print(example.add(3, 4))  # Call the add function from the C++ module
 #print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
 

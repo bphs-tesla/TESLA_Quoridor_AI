@@ -6,6 +6,8 @@
 #include <array>
 
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+
 
 struct Quoridor
 {
@@ -429,20 +431,19 @@ PYBIND11_MODULE(example, m) {
 }
 
 PYBIND11_MODULE(Quoridor, m) {
+	m.doc() = "Quoridor Cpp library";
 	pybind11::class_<Quoridor>(m, "Quoridor")
 		.def(pybind11::init<>())// 생성자 바인딩 (필요 시)
+		.def("PrintBoard", &Quoridor::PrintBoard)
 		.def_readwrite("WallH", &Quoridor::WallH)
 		.def_readwrite("WallVt", &Quoridor::WallVt)
 		.def_readwrite("P1", &Quoridor::P1)
 		.def_readwrite("P2", &Quoridor::P2)
 		.def_readwrite("WallCount", &Quoridor::WallCount)
 		.def_readwrite("isP1Turn", &Quoridor::isP1Turn);
-	m.doc() = "Quoridor Cpp library";
-
-
 
 	m.def("isWall", &isWall, "checks if the following GridPos has a wall");
 	m.def("PlaceWallH", &PlaceWallH, "places horizontal wall");
-	m.def("PlaveWallV", &PlaceWallV, "places vertical wall");
-
+	m.def("PlaceWallV", &PlaceWallV, "places vertical wall");
+	m.def("PrintBoard", &Quoridor::PrintBoard, "prints current Board");
 }

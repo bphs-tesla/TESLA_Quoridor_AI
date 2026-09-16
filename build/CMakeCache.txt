@@ -188,6 +188,16 @@ CMAKE_STATIC_LINKER_FLAGS_RELWITHDEBINFO:STRING=
 // Studio IDE projects all commands are done without /nologo.
 CMAKE_VERBOSE_MAKEFILE:BOOL=FALSE
 
+//Overwrite cached values read from Python library (classic search).
+// Turn off if cross-compiling and manually setting these values.
+PYBIND11_PYTHONLIBS_OVERWRITE:BOOL=ON
+
+//Python version to use for compiling modules
+PYBIND11_PYTHON_VERSION:STRING=
+
+//Path to a program.
+PYTHON_EXECUTABLE:FILEPATH=C:/Program Files/Python312/python.exe
+
 //Value Computed by CMake
 TESLA_Quoridor_AI_BINARY_DIR:STATIC=C:/Users/yujoo/Desktop/TESLA/TESLA_Quoridor_AI/build
 
@@ -331,4 +341,33 @@ CMAKE_STATIC_LINKER_FLAGS_RELEASE-ADVANCED:INTERNAL=1
 CMAKE_STATIC_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
+//Details about finding PYTHON
+FIND_PACKAGE_MESSAGE_DETAILS_PYTHON:INTERNAL=C:/Program Files/Python312/python.exe3.12
+//Details about finding Python3
+FIND_PACKAGE_MESSAGE_DETAILS_Python3:INTERNAL=[C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0/python3.12.exe][cfound components: Interpreter ][v3.12.10()]
+//Details about finding PythonInterp
+FIND_PACKAGE_MESSAGE_DETAILS_PythonInterp:INTERNAL=[C:/Program Files/Python312/python.exe][v3.12(3.9)]
+//Test HAS_MSVC_GL_LTCG
+HAS_MSVC_GL_LTCG:INTERNAL=1
+//ADVANCED property for variable: PYTHON_EXECUTABLE
+PYTHON_EXECUTABLE-ADVANCED:INTERNAL=1
+PYTHON_INCLUDE_DIRS:INTERNAL=C:/Program Files/Python312/Include
+PYTHON_IS_DEBUG:INTERNAL=0
+PYTHON_LIBRARIES:INTERNAL=C:/Program Files/Python312/libs/python312.lib
+PYTHON_MODULE_DEBUG_POSTFIX:INTERNAL=
+PYTHON_MODULE_EXTENSION:INTERNAL=.cp312-win_amd64.pyd
+PYTHON_MODULE_PREFIX:INTERNAL=
+PYTHON_VERSION:INTERNAL=3.12.0
+PYTHON_VERSION_MAJOR:INTERNAL=3
+PYTHON_VERSION_MINOR:INTERNAL=12
+Python_ADDITIONAL_VERSIONS:INTERNAL=3.15;3.14;3.13;3.12;3.11;3.10;3.9
+_PYBIND11_CROSSCOMPILING:INTERNAL=OFF
+_Python:INTERNAL=PYTHON
+//Path to a program.
+_Python3_EXECUTABLE:INTERNAL=C:/Program Files/WindowsApps/PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0/python3.12.exe
+//Python3 Properties
+_Python3_INTERPRETER_PROPERTIES:INTERNAL=Python;3;12;10;64;;cp312-win_amd64;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\site-packages;C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\site-packages
+_Python3_INTERPRETER_SIGNATURE:INTERNAL=d8ab548fd518e3ab79d320e080905c2e
+//Directories where pybind11 and possibly Python headers are located
+pybind11_INCLUDE_DIRS:INTERNAL=C:/Users/yujoo/Desktop/TESLA/TESLA_Quoridor_AI/.venv/Lib/site-packages/pybind11/include;C:/Program Files/Python312/Include
 
