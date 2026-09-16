@@ -5,6 +5,8 @@
 #include <queue>
 #include <array>
 
+#include <pybind11/pybind11.h>
+
 struct Quoridor
 {
 	//쿼리도 기본 시작 상태로 initialize됨
@@ -410,3 +412,39 @@ int main() {
 	*/
 	return 0;
 }
+
+
+int add(int i, int j) {
+	return i + j;
+}
+
+PYBIND11_MODULE(example, m) {
+	m.doc() = "pybind11 example plugin"; // optional module docstring
+
+	m.def("add", &add, "A function that adds two numbers");
+}
+
+/*
+
+PYBIND11_MODULE(QuoridorGame, m) {
+	pybind11::class_<Quoridor>(m, "Quoridor")
+		.def(pybind11::init<const std::string&>())// 생성자 바인딩 (필요 시)
+		.def_readwrite("WallH", &Quoridor::WallH)
+		.def_readwrite("WallVt", &Quoridor::WallVt)
+		.def_readwrite("P1", &Quoridor::P1)
+		.def_readwrite("P2", &Quoridor::P2)
+		.def_readwrite("WallCount", &Quoridor::WallCount)
+		.def_readwrite("isP1Turn", &Quoridor::isP1Turn);
+	m.doc() = "Quoridor Cpp library";
+
+
+
+	m.def("isWall", &isWall, "checks if the following GridPos has a wall");
+	m.def("PlaceWallH", &PlaceWallH, "places horizontal wall");
+	m.def("PlaveWallV", &PlaceWallV, "places vertical wall");
+
+}
+
+
+*/
+
