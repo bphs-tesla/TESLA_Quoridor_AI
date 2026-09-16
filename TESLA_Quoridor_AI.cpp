@@ -11,9 +11,9 @@ struct Quoridor
 {
 	//쿼리도 기본 시작 상태로 initialize됨
 	//쿼리도 초기 게임의 그래프를 선언 (81개의 상태 노드를 가진 그래프라고 해석시, 81*81차원의 행렬과 동치로 취급 가능)
-	bool Path[9][9][4]; //Path[행][열][상/하/좌/우] 형식으로 배열 저장
-	uint8_t WallH[8] = { NULL, }; //이거는 가로로 배치되는 벽의 격자점 위의 존재 여부를 저장한다.
-	uint8_t WallVt[8] = { NULL, }; //이거는 세로로 배치되는 벽의 격자점 위의 존재 여부를 저장한다.
+	std::array<std::array<std::array<bool, 4>, 9>, 9> Path; //Path[행][열][상/하/좌/우] 형식으로 배열 저장
+	std::array<uint8_t, 8> WallH = { NULL, }; //이거는 가로로 배치되는 벽의 격자점 위의 존재 여부를 저장한다.
+	std::array<uint8_t, 8> WallVt = { NULL, }; //이거는 세로로 배치되는 벽의 격자점 위의 존재 여부를 저장한다.
 	/*
 	WallH는 가로로 벽을 설치하기에, 상/하 움직임을 불가능하게 한다. ( k=0,1 )
 	WallV는 세로로 벽을 설치하기에, 좌/우 움직임을 불가능하게 한다. ( k=2,3 )
@@ -28,56 +28,56 @@ struct Quoridor
 		//Quoridor 초기 보드 상태 설정
 		std::fill(&Path[0][0][0], &Path[8][8][3], 1);
 		for (int i = 0; i < 9; i++) {
-			Path[0][i][0] = false; //맨 위쪽 줄에서 위쪽으로 갈수 없게
-			Path[8][i][1] = false; //맨 아래쪽 줄에서 아래쪽으로 갈수 없게
-			Path[i][0][2] = false; //맨 왼쪽 줄에서 왼쪽으로 갈수 없게
-			Path[i][8][3] = false; //맨 오른쪽 줄에서 오른쪽으로 갈수 없게
+			Path.at(0).at(i).at(0) = false; //맨 위쪽 줄에서 위쪽으로 갈수 없게
+			Path.at(8).at(i).at(1) = false; //맨 아래쪽 줄에서 아래쪽으로 갈수 없게
+			Path.at(i).at(0).at(2) = false; //맨 왼쪽 줄에서 왼쪽으로 갈수 없게
+			Path.at(i).at(8).at(3) = false; //맨 오른쪽 줄에서 오른쪽으로 갈수 없게
 		}
 	}
-	uint8_t P1[2] = { 8,4 }; //P1의 보드 위의 행/열
-	uint8_t P2[2] = { 0,4 }; //P2의 보드 위의 행/열
-	uint8_t WallCount[2] = { 10,10 }; //P1,P2의 남은 벽 개수(10이 기본이고, 벽을 쓸수록 감소함)
+	std::array<uint8_t, 2> P1 = { 8,4 }; //P1의 보드 위의 행/열
+	std::array<uint8_t, 2> P2 = { 0,4 }; //P2의 보드 위의 행/열
+	std::array<uint8_t, 2> WallCount = { 10,10 }; //P1,P2의 남은 벽 개수(10이 기본이고, 벽을 쓸수록 감소함)
 	bool isP1Turn = true; // P1의 차례이면, true, P2의 차례이면 false (P1이 선공이라서 true가 기본)
 
-	int PlaceWallH(uint8_t GridPos[2]) {
+	int PlaceWallH(std::array<uint8_t, 2> GridPos[2]) {
 		//가로로 벽을 배치하는 코드 ( k=0,1 )
 		//불가능하면 1 반환, 가능하면 0 반환
-		if ((GridPos[0] >= 8) || (GridPos[1] >= 8)) { return 1; } //유효하지 않은 좌표 예외 처리
+		if ((GridPos->at(0) >= 8) || (GridPos->at(1) >= 8)) { return 1; } //유효하지 않은 좌표 예외 처리
 		if (isWall(GridPos)) { return 1; }
-		if ((this->WallH[GridPos[0]] | 1 << GridPos[1]) & (((this->WallH[GridPos[0]] | 1 << GridPos[1]) >> 1) | ((this->WallH[GridPos[0]] | 1 << GridPos[1]) << 1))) { return 1; }//인접한 곳에 벽이 있어 충돌판정
+		if ((this->WallH[GridPos->at(0)] | 1 << GridPos->at(1)) & (((this->WallH[GridPos->at(0)] | 1 << GridPos->at(1)) >> 1) | ((this->WallH[GridPos->at(0)] | 1 << GridPos->at(1)) << 1))) { return 1; }//인접한 곳에 벽이 있어 충돌판정
 		//Pos[0], Pos[1] - 1 위치의 가로 벽이 있는지 체크(없으면 이쪽 실행)
 		//Pos[0], Pos[1] + 1 위치의 가로 벽이 있는지 체크(없으면 이쪽 실행)
 		//벽 설치 코드
-		(this->WallH)[GridPos[0]] = (this->WallH)[GridPos[0]] | (1 << (GridPos[1])); //WallH 업데이트
+		(this->WallH).at(GridPos->at(0)) = (this->WallH).at(GridPos->at(0)) | (1 << (GridPos->at(1))); //WallH 업데이트
 		//Path 업데이트
-		(this->Path)[GridPos[0] + 1][GridPos[1]][0] = false;
-		(this->Path)[GridPos[0] + 1][GridPos[1] + 1][0] = false;
-		(this->Path)[GridPos[0]][GridPos[1]][1] = false;
-		(this->Path)[GridPos[0]][GridPos[1] + 1][1] = false;
+		(this->Path).at(GridPos->at(0) + 1).at(GridPos->at(1)).at(0) = false;
+		(this->Path).at(GridPos->at(0) + 1).at(GridPos->at(1) + 1).at(0) = false;
+		(this->Path).at(GridPos->at(0)).at(GridPos->at(1)).at(1) = false;
+		(this->Path).at(GridPos->at(0)).at(GridPos->at(1) + 1).at(1) = false;
 		return 0; //정상적으로 Path & WallH 업데이트
 
 	}
 	//Quoridor 보드(의 메모리 주소)를 받아서 벽을 배치하는 함수
-	int PlaceWallV(uint8_t GridPos[2]) {
+	int PlaceWallV(std::array<uint8_t, 2> GridPos[2]) {
 		//세로로 벽을 배치하는 코드 ( k=2,3 )
 		//불가능하면 1 반환, 가능하면 0 반환
-		if ((GridPos[0] >= 8) || (GridPos[1] >= 8)) { return 1; } //유효하지 않은 좌표 예외 처리
+		if ((GridPos->at(0) >= 8) || (GridPos->at(1) >= 8)) { return 1; } //유효하지 않은 좌표 예외 처리
 		if (isWall(GridPos)) { return 1; }
-		if ((this->WallVt[GridPos[1]] | 1 << GridPos[0]) & (((this->WallVt[GridPos[1]] | 1 << GridPos[0]) >> 1) | ((this->WallVt[GridPos[1]] | 1 << GridPos[0]) << 1))) { return 1; }//인접한 곳에 벽이 있어 충돌판정
+		if ((this->WallVt[GridPos->at(1)] | 1 << GridPos->at(0)) & (((this->WallVt[GridPos->at(1)] | 1 << GridPos->at(0)) >> 1) | ((this->WallVt[GridPos->at(1)] | 1 << GridPos->at(0)) << 1))) { return 1; }//인접한 곳에 벽이 있어 충돌판정
 		//Pos[0], Pos[1] +- 1 위치의 세로 벽이 있는지 체크(없으면 이쪽 실행)
 		//벽 설치 코드
-		(this->WallVt)[GridPos[1]] = (this->WallVt)[GridPos[1]] | (1 << (GridPos[0])); //WallVt 업데이트
+		(this->WallVt).at(GridPos->at(1)) = (this->WallVt).at(GridPos->at(1)) | (1 << (GridPos->at(0))); //WallVt 업데이트
 		//Path 업데이트
-		(this->Path)[GridPos[0]][GridPos[1] + 1][2] = false;
-		(this->Path)[GridPos[0] + 1][GridPos[1] + 1][2] = false;
-		(this->Path)[GridPos[0]][GridPos[1]][3] = false;
-		(this->Path)[GridPos[0] + 1][GridPos[1]][3] = false;
+		(this->Path)[GridPos->at(0)][GridPos->at(1) + 1][2] = false;
+		(this->Path)[GridPos->at(0) + 1][GridPos->at(1) + 1][2] = false;
+		(this->Path)[GridPos->at(0)][GridPos->at(1)][3] = false;
+		(this->Path)[GridPos->at(0) + 1][GridPos->at(1)][3] = false;
 		return 0; //정상적으로 Path & WallV 업데이트
 	}
 
-	bool isWall(uint8_t GridPos[2]) {
-		if ((this->WallVt)[GridPos[1]] & (1 << GridPos[0])) { return true; } //그 자리에 이미 벽이 존재
-		if ((this->WallH)[GridPos[0]] & (1 << GridPos[1])) { return true; } //그 자리에 이미 벽이 존재
+	bool isWall(std::array<uint8_t, 2> GridPos[2]) {
+		if ((this->WallVt)[GridPos->at(1)] & (1 << GridPos->at(0))) { return true; } //그 자리에 이미 벽이 존재
+		if ((this->WallH)[GridPos->at(0)] & (1 << GridPos->at(1))) { return true; } //그 자리에 이미 벽이 존재
 		return false;
 	}
 
@@ -158,9 +158,9 @@ struct Quoridor
 		//0b[플레이어/벽설치][가로/세로][행(3비트)][열(3비트)] 가로: 0, 세로: 1
 		//0b0[점프 유무][명령1(3비트)][명령2(3비트)] 점프시 1, 아니면 0
 		//0b1[가로/세로][행(3비트)][열(3비트)]
-		uint8_t MoveVariable[2];
-		MoveVariable[0] = (Move & (0b111 << 3)) >> 3;
-		MoveVariable[1] = Move & 0b111;
+		std::array<uint8_t, 2> MoveVariable;
+		MoveVariable.at(0) = (Move & (0b111 << 3)) >> 3;
+		MoveVariable.at(1) = Move & 0b111;
 		//MoveVariable은 Move에서 2개의 3비트 인수를 2개의 uint8_t 배열로 바꿔 저장한것임(안그러면 가독성이 너무 구려서)
 		switch (Move & (0b11 << 6)) {
 		case (0b00 << 6):
@@ -169,37 +169,37 @@ struct Quoridor
 			if (MoveVariable[0] > 3) { return false; } //정의되지 않은 범위
 			if (this->isP1Turn) {
 				//P1의 차례(P1이 이동할때)
-				if (this->Path[this->P1[0]][this->P1[1]][MoveVariable[0]]) {
+				if (this->Path[this->P1[0]][this->P1[1]][MoveVariable.at(0)]) {
 					//이동 가능
 					return true;
 				}
 			}
 			else {
 				//P2의 차례
-				if (this->Path[this->P2[0]][this->P2[1]][MoveVariable[0]]) {
+				if (this->Path[this->P2[0]][this->P2[1]][MoveVariable.at(0)]) {
 					//이동 가능
 					return true;
 				}
 				return false; //예외 처리(Path에 1이 존재하지 않음, 즉 벽에 가로막힘)
 		case (0b01 << 6):
 			//0b01[명령1(3비트)][명령2(3비트)] 점프 O
-			if (this->Path[this->P2[0]][this->P2[1]][MoveVariable[0]]) {
+			if (this->Path[this->P2[0]][this->P2[1]][MoveVariable.at(0)]) {
 				//이동 가능
 
 				return true;
 			}
 
-
+			
 
 			break;
 		case (0b10 << 6):
 			//0b10[행(3비트)][열(3비트)] 가로 벽 설치
-			if ((this->WallH[MoveVariable[0]] | 1 << MoveVariable[1]) & (((this->WallH[MoveVariable[0]] | 1 << MoveVariable[1]) >> 1) | ((this->WallH[MoveVariable[0]] | 1 << MoveVariable[1]) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
-			return !isWall(MoveVariable); //가로 벽 설치 가능 여부 판단(bitshift때문에, 범위 판정은 안해도 됨)
+			if ((this->WallH[MoveVariable.at(0)] | 1 << MoveVariable.at(1)) & (((this->WallH[MoveVariable.at(0)] | 1 << MoveVariable.at(1)) >> 1) | ((this->WallH[MoveVariable.at(0)] | 1 << MoveVariable.at(1)) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
+			return !isWall(&MoveVariable); //가로 벽 설치 가능 여부 판단(bitshift때문에, 범위 판정은 안해도 됨)
 		case (0b11 << 6):
 			//0b11[행(3비트)][열(3비트)] 세로 벽 설치
-			if ((this->WallVt[MoveVariable[1]] | 1 << MoveVariable[0]) & (((this->WallVt[MoveVariable[1]] | 1 << MoveVariable[0]) >> 1) | ((this->WallVt[MoveVariable[1]] | 1 << MoveVariable[0]) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
-			return !isWall(MoveVariable); //세로 벽 설치 가능 여부 판단(bitshift때문에, 범위 판정은 안해도 됨)
+			if ((this->WallVt[MoveVariable.at(1)] | 1 << MoveVariable.at(0)) & (((this->WallVt[MoveVariable.at(1)] | 1 << MoveVariable.at(0)) >> 1) | ((this->WallVt[MoveVariable.at(1)] | 1 << MoveVariable.at(0)) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
+			return !isWall(&MoveVariable); //세로 벽 설치 가능 여부 판단(bitshift때문에, 범위 판정은 안해도 됨)
 			}
 		}
 		return false; //어떻게 여기까지 올 수 있는지는 모르겠지만????? 만일을 위해서 예외 처리
@@ -333,18 +333,18 @@ int AStar(Quoridor* Board) {
 
 int main() {
 	struct Quoridor Board;
-	uint8_t H[2] = { 2,7 };
-	uint8_t H2[2] = { 0,2 };
-	uint8_t V[2] = { 1,7 };
-	uint8_t V2[2] = { 2,3 };
+	std::array<uint8_t, 2> H = { 2,7 };
+	std::array<uint8_t, 2>  H2 = { 0,2 };
+	std::array<uint8_t, 2>  V = { 1,7 };
+	std::array<uint8_t, 2>  V2 = { 2,3 };
 	//uint8_t V[2] = { 3,4 };
-	Board.PlaceWallH(H);
-	Board.PlaceWallV(V);
-	Board.PlaceWallH(H2);
-	Board.PlaceWallV(V2);
-	uint8_t GridWallPos[2] = { 0,0 };
-	for (int i = 0; i < 8; i++, GridWallPos[1]++) {
-		Board.PlaceWallH(GridWallPos);
+	//Board.PlaceWallH(&H);
+	Board.PlaceWallV(&V);
+	Board.PlaceWallH(&H2);
+	Board.PlaceWallV(&V2);
+	std::array<uint8_t, 2> GridWallPos = { 0,0 };
+	for (int i = 0; i < 8; i++, GridWallPos.at(1)++) {
+		Board.PlaceWallH(&GridWallPos);
 	}
 	//PlaceWallVt(&Board, V2);
 	printf("Distance: %d\n\n", AStar(&Board));
