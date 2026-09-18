@@ -1,9 +1,0 @@
-C:/Users/yujoo/Desktop/TESLA/TESLA_Quoridor_AI/build/CMakeFiles/TESTfunc.dir
-C:/Users/yujoo/Desktop/TESLA/TESLA_Quoridor_AI/build/CMakeFiles/example.dir
-C:/Users/yujoo/Desktop/TESLA/TESLA_Quoridor_AI/build/CMakeFiles/Quoridor.dir
-C:/Users/yujoo/Desktop/TESLA/TESLA_Quoridor_AI/build/CMakeFiles/PlaceWallH.dir
-C:/Users/yujoo/Desktop/TESLA/TESLA_Quoridor_AI/build/CMakeFiles/PlaceWallV.dir
-C:/Users/yujoo/Desktop/TESLA/TESLA_Quoridor_AI/build/CMakeFiles/isWall.dir
-C:/Users/yujoo/Desktop/TESLA/TESLA_Quoridor_AI/build/CMakeFiles/PrintBoard.dir
-C:/Users/yujoo/Desktop/TESLA/TESLA_Quoridor_AI/build/CMakeFiles/ALL_BUILD.dir
-C:/Users/yujoo/Desktop/TESLA/TESLA_Quoridor_AI/build/CMakeFiles/ZERO_CHECK.dir
