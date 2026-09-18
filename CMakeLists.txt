@@ -12,10 +12,4 @@ find_package(pybind11 REQUIRED)
 
 
 # 파이썬 모듈 생성
-pybind11_add_module(TESTfunc TESLA_Quoridor_AI.cpp)
-pybind11_add_module(example TESLA_Quoridor_AI.cpp)
 pybind11_add_module(Quoridor TESLA_Quoridor_AI.cpp)
-pybind11_add_module(PlaceWallH TESLA_Quoridor_AI.cpp)
-pybind11_add_module(PlaceWallV TESLA_Quoridor_AI.cpp)
-pybind11_add_module(isWall TESLA_Quoridor_AI.cpp)
-pybind11_add_module(PrintBoard TESLA_Quoridor_AI.cpp)
