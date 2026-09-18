@@ -439,5 +439,6 @@ PYBIND11_MODULE(Quoridor, m) {
 	m.def("PlaceWallH", &PlaceWallH, "places horizontal wall");
 	m.def("PlaceWallV", &PlaceWallV, "places vertical wall");
 	m.def("PrintBoard", &Quoridor::PrintBoard, "prints current Board");
-	m.def("AStar_Distance", &AStar, "finds the shortest distance between ")
+	m.def("AStar_Distance". &AStar, "finds the shortest distance between ")
+	m.def("AStar", &AStar, "finds the distance between Player and destination");
 }
