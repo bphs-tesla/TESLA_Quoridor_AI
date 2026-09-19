@@ -1,6 +1,4 @@
-
 import os
-
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import Model, Sequential
@@ -8,13 +6,9 @@ from tensorflow.keras.layers import Dense, Embedding, Reshape
 from tensorflow.keras.optimizers import Adam
 import numpy as np
 import random
-import gymnasium as gym
 
-import pybind11
 import sys
 sys.path.append('../TESLA_Quoridor_AI/build/Debug')  # Add the path to TESLA_Quoridor_AI module
-#C:\Users\yujoo\Desktop\TESLA\TESLA_Quoridor_AI\build\Debug
-#C:\Users\yujoo\Desktop\TESLA\TESLA_Quoridor_AI
 #print(Quoridor("Board"))
 
 import Quoridor
@@ -31,13 +25,16 @@ Quoridor.PlaceWallH(Board, [1,7])
 Quoridor.PlaceWallV(Board, [1,6])
 
 #print(Quoridor.MovePlayer(Board, 255))
-print(Board.P1)
+#print(Board.P1)
 #print(Board.P2)
 #print(Board.WallCount)
-print(Board.isP1Turn)
-Board.PrintBoard()
+#print(Board.isP1Turn)
+
 print(Quoridor.AStar(Board))
-print(Quoridor.canPlaceWallV(Board, [1, 6]))  # Example usage of the C++ function
+#Board.P2 = [8,5]
+print(Quoridor.isGameOver(Board))
+#print(Quoridor.canPlaceWallV(Board, [1, 6]))  # Example usage of the C++ function
+Board.PrintBoard()
 
 #print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
@@ -200,8 +197,8 @@ class DQNAgent:
     def target_model_update(self):
         #모델 가중치를 목표 모델의 가중치에 설정
         self.set_weights(self.model, self.target_model)
-    
-    def act(self, s):
+    '''
+        def act(self, s):
         #엘실론 기반으로 에이전트가 학습된 Q* 함수를 기반으로 움직이거니 무작위 선택에 의해 움직이게 함
         #엡실론 기반으로 다음 행동을 예측하거나 임의로 다음 행동을 택함
         if np.random.rand() <= self.epsilon:
@@ -212,10 +209,24 @@ class DQNAgent:
             #최선의 행동을 반환
             best_action = np.argmax(q)
             return best_action
-        
+    '''
+    def act(self, s, valid_actions):
+
+        if np.random.rand() <= self.epsilon:
+            return random.choice(valid_actions)
+
+        q = self.model.predict(self.sess, s)[0]
+
+        mask = np.full(self.nA, -np.inf)
+        mask[valid_actions] = 0
+
+        q = q + mask
+
+        return np.argmax(q)
+            
     def replay(self):
         #메모리에서 랜덤 배치를 가져옴
-        batch = np.array(random.sample(self.memory.recall_memories(), self.batch_size)
+        batch = np.array(random.sample(self.memory.recall_memories(), self.batch_size))
         #현재 상태의 시퀀스 가져옴
         s = np.vstack(batch[:, 0])
         
@@ -232,12 +243,144 @@ class DQNAgent:
         status = np.where(batch[:, 4] == False)
         
         #우리 모델과 목표 모델의 보상을 예측하기 위해 모델을 사용
-        ''''
+        next_reward = self.model.predict(self.sess, s_p)
+        final_reward = self.target.model.predict(self.sess, s_p)
+        
+        if len(status[0]) > 0:
+            #목표 모델을 이용한 최종이 아닌 상태 업데이트 규칙
+            #보상이 최종 목표에서 비롯된 것이 아니면, 그 보상은 부분적인 것이다(r0)
+            #나머지를 더하고, 목표 예측을 사용해 최종 보상을 대체
+            best_next_action = np.argmax(nect_reward[status, :][0], axis = 1)
+            
+            #할인된 최종 보상을 더함
+            r[status] += np.multiply(self.gamma, final_reward[status, best_next_action][0])
+            
+        #관측된 행동과 보상을 다룰 때 행동에 대해 예측된 보상을 대체
+        expected_reward = self.model.predict(self.sess, s)
+        expected_reward [range(self.batch_size), a] = r
+        
+        #상태를 예측/관측된 보상에 대해 다시 적합시킴
+        self.model.fit(self.sess, s, expected_reward, epochs = self.epochs)
+        
+    def get_valid_actions(self):
+        return Quoridor.GetValidActions(self.Board)
         
         
+
+class Environment:
+    def __init__(self):
+        #환경 초기화
+        self.Board = None
+        self.done = False
+        self.winner = None
+        self.nA = 132 #보드의 상태에서 취할 수 있는 행동의 최대 가짓수
         
-        미완성~~~~~~
-        
-        
-        
-        '''
+    def reset(self):
+        #보드 초기화
+        self.board = Quoridor.Quoridor()
+
+        self.done = False
+        self.winner = None
+
+        return self.get_state()
+
+    def get_state(self):
+
+        state = np.zeros((9, 9, 7), dtype=np.float32)
+
+        # P1
+        state[self.board.P1[0], self.board.P1[1], 0] = 1.0
+
+        # P2
+        state[self.board.P2[0], self.board.P2[1], 1] = 1.0
+
+        # Horizontal walls
+        for x in range(8):
+            for y in range(8):
+                if self.board.WallH[x] & (1 << y):
+                    state[x, y, 2] = 1.0
+
+        # Vertical walls (transposed)
+        for x in range(8):
+            for y in range(8):
+                if self.board.WallVt[y] & (1 << x):
+                    state[x, y, 3] = 1.0
+
+        # Turn
+        if self.board.isP1Turn:
+            state[:, :, 4] = 1.0
+        else:
+            state[:, :, 4] = -1.0
+
+        # Remaining walls
+        state[:, :, 5] = self.board.WallCount[0] / 10.0 #P1 WallCount / 10
+        state[:, :, 6] = self.board.WallCount[1] / 10.0 #P2 WallCount / 10
+
+        return state.flatten() #nS = 9*9*7 = 567
+    
+    def step(self, action):
+
+        if self.done:
+            raise RuntimeError("Game is already finished.")
+
+        # 행동 실행
+        result = self.execute_action(action)
+
+        # 승패 확인
+        reward = self.calculate_reward()
+
+        # 종료 여부
+        done = self.check_done()
+
+        next_state = self.get_state()
+
+        return next_state, reward, done
+    
+def execute_action(self, action):
+
+    # 이동
+    if action < 4:
+
+        move = action
+
+        result = Quoridor.MovePlayer(
+            self.board,
+            move
+        ) #상,하,좌,우 이동
+
+    # 가로벽
+    elif action < 68:
+
+        wall_action = action - 4
+
+        x = wall_action // 8
+        y = wall_action % 8
+
+        result = Quoridor.PlaceWallH(
+            self.board,
+            [x, y]
+        )
+
+    # 세로벽
+    else:
+
+        wall_action = action - 68
+
+        x = wall_action // 8
+        y = wall_action % 8
+
+        result = Quoridor.PlaceWallV(
+            self.board,
+            [x, y]
+        )
+
+    return result
+
+def calculate_reward(self):
+    winner = self.isGameOver
+    if winner != 0:
+        if winner == 1:
+            return -1.0 #패배(봇은 P2)
+        else:
+            return 1.0#승리(봇은 P2)
+    return 0.0
