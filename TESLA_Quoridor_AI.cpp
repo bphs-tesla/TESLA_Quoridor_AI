@@ -302,7 +302,7 @@ bool isConnected(Quoridor Board) {
 //}
 
 bool canPlaceWallH(Quoridor* Board, std::array<uint8_t, 2> GridPos) {
-
+	if ((Board->isP1Turn ? Board->WallCount.at(0) : Board->WallCount.at(1)) <= 0) { return false; } //벽 개수 없을때
 	if ((GridPos.at(0) >= 8) || (GridPos.at(1) >= 8)) { return false; } //유효하지 않은 좌표 예외 처리
 	if (isWall(Board, GridPos)) { return false; }
 	if ((Board->WallH[GridPos.at(0)] | 1 << GridPos.at(1)) & (((Board->WallH[GridPos.at(0)] | 1 << GridPos.at(1)) >> 1) | ((Board->WallH[GridPos.at(0)] | 1 << GridPos.at(1)) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
@@ -326,6 +326,7 @@ bool canPlaceWallH(Quoridor* Board, std::array<uint8_t, 2> GridPos) {
 }
 
 bool canPlaceWallV(Quoridor* Board, std::array<uint8_t, 2> GridPos) {
+	if ((Board->isP1Turn ? Board->WallCount.at(0) : Board->WallCount.at(1)) <= 0) { return false; } //벽 개수 없을때
 	if ((GridPos.at(0) >= 8) || (GridPos.at(1) >= 8)) { return false; } //유효하지 않은 좌표 예외 처리
 	if (isWall(Board, GridPos)) { return false; }
 	if ((Board->WallVt[GridPos.at(1)] | 1 << GridPos.at(0)) & (((Board->WallVt[GridPos.at(1)] | 1 << GridPos.at(0)) >> 1) | ((Board->WallVt[GridPos.at(1)] | 1 << GridPos.at(0)) << 1))) { return false; }//인접한 곳에 벽이 있어 충돌판정
@@ -356,6 +357,11 @@ bool canMovePlayer(Quoridor* Board, uint8_t Move) {
 	return false;
 }
 
+inline void PassTurn(Quoridor* Board) {
+	Board->isP1Turn = !Board->isP1Turn; //isP1Turn을 반대로 저장
+	return;
+}
+
 int PlaceWallH(Quoridor* Board, std::array<uint8_t, 2> GridPos) {
 	//가로로 벽을 배치하는 코드 ( k=0,1 )
 	//불가능하면 1 반환, 가능하면 0 반환
@@ -369,6 +375,7 @@ int PlaceWallH(Quoridor* Board, std::array<uint8_t, 2> GridPos) {
 		(Board->Path).at(GridPos.at(0) + 1).at(GridPos.at(1) + 1).at(0) = false;
 		(Board->Path).at(GridPos.at(0)).at(GridPos.at(1)).at(1) = false;
 		(Board->Path).at(GridPos.at(0)).at(GridPos.at(1) + 1).at(1) = false;
+		PassTurn(Board);
 		return 0; //정상적으로 Path & WallH 업데이트
 	}
 	return 1; //예외 처리
@@ -383,10 +390,11 @@ int PlaceWallV(Quoridor* Board, std::array<uint8_t, 2> GridPos) {
 		//벽 설치 코드
 		(Board->WallVt).at(GridPos.at(1)) = (Board->WallVt).at(GridPos.at(1)) | (1 << (GridPos.at(0))); //WallVt 업데이트
 		//Path 업데이트
-		(Board->Path)[GridPos.at(0)][GridPos.at(1) + 1][2] = false;
-		(Board->Path)[GridPos.at(0) + 1][GridPos.at(1) + 1][2] = false;
-		(Board->Path)[GridPos.at(0)][GridPos.at(1)][3] = false;
-		(Board->Path)[GridPos.at(0) + 1][GridPos.at(1)][3] = false;
+		(Board->Path).at(GridPos.at(0)).at(GridPos.at(1) + 1).at(2) = false;
+		(Board->Path).at(GridPos.at(0) + 1).at(GridPos.at(1) + 1).at(2) = false;
+		(Board->Path).at(GridPos.at(0)).at(GridPos.at(1)).at(3) = false;
+		(Board->Path).at(GridPos.at(0) + 1).at(GridPos.at(1)).at(3) = false;
+		PassTurn(Board);
 		return 0; //정상적으로 Path & WallV 업데이트
 	}
 	return 1; //예외 처리
@@ -420,8 +428,9 @@ int MovePlayer(Quoridor* Board, uint8_t Move) {
 		}
 		else {
 			//성공적으로 플레이어 이동 => 턴 넘김
-			Board->isP1Turn = !Board->isP1Turn;
+			PassTurn(Board);
 			//printf("turn passed\n");
+
 			return 0;
 		}
 	}
@@ -439,6 +448,31 @@ int isGameOver(Quoridor* Board) {
 	else {
 		return 0;
 	}
+}
+
+std::vector<int> GetValidActions(Quoridor* Board) {
+	std::array<uint8_t, 2> Player = Board->isP1Turn ? Board->P1 : Board->P2;
+	std::vector<int> ValidActions;
+	for (int i = 0; i < 4; i++) {
+		if (!canMovePlayer(Board, i)) {
+			//이동 가능
+			ValidActions.emplace_back(i);
+		}
+	}
+	std::array<uint8_t, 2> GridPos = { 0,0 };
+	for (uint8_t i = 0; i < 64; i++) {
+		GridPos.at(0) = i / 8;
+		GridPos.at(1) = i % 8;
+		if (!canPlaceWallH(Board, GridPos)) {
+			//가로벽 설치 가능
+			ValidActions.emplace_back(i + 4);
+		}
+		if (!canPlaceWallV(Board, GridPos)) {
+			//세로벽 설치 가능
+			ValidActions.emplace_back(i + 68);
+		}
+	}
+	return ValidActions;
 }
 
 int main() {
@@ -548,4 +582,5 @@ PYBIND11_MODULE(Quoridor, m) {
 	m.def("MovePlayer", &MovePlayer, "moves player");
 	m.def("AStar", &AStar, "finds the distance between Player and destination");
 	m.def("isGameOver", &isGameOver, "checks if the game is over and returns the winner");
+	m.def("GetValidActions", &GetValidActions, "gets a vector of valid actions");
 }
