@@ -1,12 +1,13 @@
 import sys
 
 sys.path.append('../TESLA_Quoridor_AI/build/Debug')  # Add the path to TESLA_Quoridor_AI module
-sys.path.append('../TESLA_Quoridor_AI')
+#sys.path.append('../TESLA_Quoridor_AI')
 #print(Quoridor("Board"))
+sys.path.insert(0, './build-linux')
 
 import Quoridor
 
-import Quoridor
+
 
 Board = Quoridor.Quoridor()
 '''

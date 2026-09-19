@@ -1,15 +1,14 @@
 cmake_minimum_required(VERSION 3.12)
 project(TESLA_Quoridor_AI)
 
-# pybind11 패키지 찾기
-set(pybind11_DIR
-    "../TESLA_Quoridor_AI/.venv/Lib/site-packages/pybind11/share/cmake/pybind11"
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
+
+execute_process(
+    COMMAND "${Python_EXECUTABLE}" -m pybind11 --cmakedir
+    OUTPUT_VARIABLE pybind11_DIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-find_package(pybind11 REQUIRED)
+find_package(pybind11 CONFIG REQUIRED)
 
-
-
-
-# 파이썬 모듈 생성
 pybind11_add_module(Quoridor TESLA_Quoridor_AI.cpp)

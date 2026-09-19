@@ -364,3 +364,5 @@ FodyWeavers.xsd
 
 .venv
 build
+build-linux
+TESLA_Quoridor_AI
