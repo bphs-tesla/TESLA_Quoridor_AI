@@ -4,14 +4,18 @@ from tensorflow import keras
 from tensorflow.keras import Model, Sequential
 from tensorflow.keras.layers import Dense, Embedding, Reshape
 from tensorflow.keras.optimizers import Adam
+
+from collections import deque
 import numpy as np
 import random
 
 import sys
 sys.path.append('../TESLA_Quoridor_AI/build/Debug')  # Add the path to TESLA_Quoridor_AI module
+sys.path.append('../TESLA_Quoridor_AI')
 #print(Quoridor("Board"))
 
 import Quoridor
+'''
 Board = Quoridor.Quoridor()
 
 #Board.P1 = [0, 0]
@@ -24,90 +28,105 @@ for i in range(4):
 Quoridor.PlaceWallH(Board, [1,7])
 Quoridor.PlaceWallV(Board, [1,6])
 
-#print(Quoridor.MovePlayer(Board, 255))
-#print(Board.P1)
-#print(Board.P2)
-#print(Board.WallCount)
-#print(Board.isP1Turn)
-
 print(Quoridor.AStar(Board))
 #Board.P2 = [8,5]
 print(Quoridor.isGameOver(Board))
 #print(Quoridor.canPlaceWallV(Board, [1, 6]))  # Example usage of the C++ function
 Board.PrintBoard()
 
+'''
+
+#print(Quoridor.MovePlayer(Board, 255))
+#print(Board.P1)
+#print(Board.P2)
+#print(Board.WallCount)
+#print(Board.isP1Turn)
+
+
+
 #print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
+#아래는 chatgpt가 tensorflow 2.x 버전으로 바꾼 것
+#맞는지는 보장 못함 ㅎ
 class Network:
-    def __init__(self, nS, nA, scope = "estimator",
-          learning_rate=0.0001,
-          neural_architecture = None,
-          global_step = None,
-          summaries_dir = None
-          ):
-          self.nS = nS
-          self.nA = nA
-          self.global_step = global_step
-          self.learning_rate = learning_rate
 
-          if not neural_architecture:
-              self.neural_architecture = self.two_layers_network
-              
-          with tf.variable_scope(scope):
-               self.create_network(network = neural_architecture, learning_rate = self.learning_rate)
-               if summaries_dir:
-                    summary_dir = os.path.join(summaries_dir, "summaries_%s" % scope)
-                    if not os.path.exists(summary_dir):
-                         os.makedirs(summary_dir)
-                    self.summary_writer = tf.summary.FileWriter(summary_dir)
-               else:
-                    self.summary_writer = None
-                    
-def two_layers_network(self, x, layer_1_nodes = 32, layer_2_nodes = 32):
-    layer_1 = tf.contrib.layers.fully_connected(x, layer_1_nodes, activation_fn=tf.nn.leaky_relu)
-    layer_2 = tf.contrib.layers.fully_connected(layer_1, layer_2_nodes, activation_fn=tf.nn.leaky_relu)
-    return tf.contrib.layers.fully_connected(layer_2, self.nA, activation_fn=None)
+    def __init__(
+        self,
+        nS,
+        nA,
+        scope="estimator",
+        learning_rate=0.0001,
+        neural_architecture=None,
+        global_step=None,
+        summaries_dir=None
+    ):
 
-def create_network(self, network, learning_rate = 0.0001):
-    #상태 입력을 위한 플레이스홀더 정의
-    self.X = tf.placeholder(shape = [None, self.nS], dtype = tf.float32, name = "X")
-    #r 목표값
-    self.y = tf.placeholder(shape = [None, self.nA], dtype = tf.float32, name = "y")
-    
-    #선택된 네트워크 적용
-    self.predictions = network(self, self.X)
-    
-    #손실값 계산
-    self.loss = tf.reduce_mean(tf.squared_difference(self.predictions, self.y))
-    
-    #Adam optimizer를 사용하여 손실값 최소화
-    self.train_op = tf.contrib.layers.optimize_loss(
-        loss = self.loss,
-        global_step = tf.train.get_global_step(),
-        learning_rate = learning_rate,
-        optimizer = "Adam")
-    
-    #텐서보드를 위한 요약 정보 기록
-    self.summaries = tf.summary.merge([
-        tf.summary.scalar("loss", self.loss),
-        tf.summary.scalar("max_q_value", tf.reduce_max(self.predictions)),
-        tf.summary.scalar("mean_q_value", tf.reduce_mean(self.predictions))])
-    
-def predict(self, sess, s):
-    #주어진 상태 s에 대한 Q값 예측
-    return sess.run(self.predictions, feed_dict = {self.X: s})
+        self.nS = nS
+        self.nA = nA
+        self.learning_rate = learning_rate
+        self.scope = scope
 
-def fit(self, sess, s, r, epochs = 1):
-    #Q 함수 추정값 업데이트
-    feed_dict = {self.X: s, self.y: r}
-    
-    for epoch in range(epochs):
-        res = sess.run([self.summaries, self.train_op, self.loss, self.predictions, tf.train.get_global_step()], feed_dict = feed_dict)
-        summaries, train_op, loss, predictions, global_step = res
+        # DQN 신경망
+        self.model = keras.Sequential([
+            keras.layers.Input(shape=(nS,)),
+
+            Dense(
+                256,
+                activation="relu"
+            ),
+
+            Dense(
+                256,
+                activation="relu"
+            ),
+
+            Dense(
+                nA,
+                activation=None
+            )
+        ])
+
+        self.optimizer = Adam(
+            learning_rate=learning_rate
+        )
+
+        self.model.compile(
+            optimizer=self.optimizer,
+            loss="mse"
+        )
+
+    def predict(self, s):
+
+        s = np.asarray(
+            s,
+            dtype=np.float32
+        )
+
+        return self.model.predict(
+            s,
+            verbose=0
+        )
+
+    def fit(self, s, target):
+
+        s = np.asarray(
+            s,
+            dtype=np.float32
+        )
+
+        target = np.asarray(
+            target,
+            dtype=np.float32
+        )
+
+        return self.model.fit(
+            s,
+            target,
+            epochs=1,
+            verbose=0
+        )
         
-    if self.summary_writer:
-        self.summary_writer.add_summary(summaries, global_step)
-        
+
 class Memory:
     '''
     dequeue를 기반으로 한 경험 재생 메모리 클래스
@@ -126,151 +145,238 @@ class Memory:
         #메모리에서 무작위로 배치 샘플을 추출
         return list(self.memory)
     
+    def sample(self, batch_size):
+        return random.sample(
+            self.memory,
+            batch_size
+        )
+    
 class DQNAgent:
-    def __init__(self, nS, nA, experiment_dir):
-        # 초기화
+    #아래는 chatgpt가 tensorflow 2.x 버전으로 바꾼 것
+    #맞는지는 보장 못함 ㅎ
+    def __init__(
+        self,
+        nS,
+        nA,
+        experiment_dir
+    ):
+
         self.nS = nS
         self.nA = nA
-        self.epsilon = 1.0  # 초기 탐험률
-        self.epsilon_min = 0.01  # 최소 탐험률
-        self.epsilon_decay = 0.995  # 탐험률 감소율
-        self.gamma = 0.99  # 할인율
-        self.learning_rate = 0.0001  # 학습률
-        self.epochs = 10  # 학습 에포크 수
-        self.batch_size = 32  # 배치 크기
-        self.memory = Memory(memory_size = 250000)  # 경험 재생 메모리 초기화
+
+        self.epsilon = 1.0
+        self.epsilon_min = 0.01
+        self.epsilon_decay = 0.995
+
+        self.gamma = 0.99
+
+        self.learning_rate = 0.0001
+
+        self.batch_size = 32
+
+        self.memory = Memory(
+            memory_size=250000
+        )
+
+        self.experiment_dir = os.path.abspath(
+            experiment_dir
+        )
+
+        os.makedirs(
+            self.experiment_dir,
+            exist_ok=True
+        )
+
+        # Q network
+        self.model = Network(
+            nS=self.nS,
+            nA=self.nA,
+            scope="q",
+            learning_rate=self.learning_rate
+        )
+
+        # Target network
+        self.target_model = Network(
+            nS=self.nS,
+            nA=self.nA,
+            scope="target_q",
+            learning_rate=self.learning_rate
+        )
+
+        # Target network 초기화
+        self.target_model.model.set_weights(
+            self.model.model.get_weights()
+        )
         
-    #추정 모델 생성
-        self.experiment_dir = os.path.abspath("./experiments/{}".format(experiment_dir))
-        self.global_step = tf.Variable(0, name = "global_step", trainable = False)
-        self.model = Network(nS = self.nS,
-            nA = self.nA,
-            scope = "q",
-            learning_rate = self.learning_rate,
-            global_step = self.global_step,
-            summaries_dir = self.experiment_dir)
-        self.target_model = Network(nS = self.nS,
-            nA = self.nA,
-            scope = "target_q",
-            learning_rate = self.learning_rate,
-            global_step = self.global_step)
-        
-        #변수를 초기화하기 위한 박업 추가
-        init_op = tf.global_variables_initializer()
-        
-        #모든 변수를 저징하고 복원하기 위한 작업 추가
-        self.saver = tf.train.Saver()
-        
-        #세션 생성
-        self.sess = tf.Session()
-        self.sess.rn(init_op)
-    
     def epsilon_update(self):
         #탐험률 감소
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
         
     def save_weights(self, filename):
-        #모델 가중치 저장
-        save_path = self.saver.save(self.sess, "%s.ckpt" % filename)
-        print("Model weights saved in path: %s" % save_path)
+
+        self.model.model.save_weights(
+            filename
+        )
+
+        print(
+            f"Model weights saved: {filename}"
+        )
         
     def load_weights(self, filename):
-        #모델 가중치 로드
-        self.saver.restore(self.sess, "%s.ckpt" % filename)
-        print("Model weights resotred from path: %s" % filename)
 
-    def set_weights(self, model_1, model_2):
-        #model_1: 
-        #model_2: 
-        model_1_params = [t for t in tf.trainable_variables() if t.name.startswith(model_1.scope)]
-        model_2_params = [t for t in tf.trainable_variables() if t.name.startswith(model_2.scope)]
-        model_1_params = sorted(model_1_params, key = lambda x: x.name)
-        model_2_params = sorted(model_2_params, key = lambda x: x.name)
-        
-        #실행될 작업 열거
-        operations = [coef_2.assign(coef_1) for coef_1, coef_2 in zip(model_1_params, model_2_params)]
-        
-        #실행될 작업 실행
-        self.sess.run(operations)
-        
-    def target_model_update(self):
-        #모델 가중치를 목표 모델의 가중치에 설정
-        self.set_weights(self.model, self.target_model)
+        self.model.model.load_weights(
+            filename
+        )
+
+        print(
+            f"Model weights loaded: {filename}"
+        )
+
+    def update_target_model(self):
+        self.target_model.model.set_weights(self.model.model.get_weights())
     '''
-        def act(self, s):
-        #엘실론 기반으로 에이전트가 학습된 Q* 함수를 기반으로 움직이거니 무작위 선택에 의해 움직이게 함
-        #엡실론 기반으로 다음 행동을 예측하거나 임의로 다음 행동을 택함
-        if np.random.rand() <= self.epsilon:
-            return np.random.choice(self.nA)
-        else:
-            #모든 가능한 행동에 대한 q값 추정
-            q = self.model.predict(self.sess, s)[0]
-            #최선의 행동을 반환
-            best_action = np.argmax(q)
-            return best_action
+        def act(self, s, valid_actions):
+            # Exploration
+            if np.random.rand() < self.epsilon:
+                return random.choice(valid_actions)
+
+            # Q-value 계산
+            s = np.asarray(
+                s,
+                dtype=np.float32
+            ).reshape(1, -1)
+
+            q = self.model.predict(s)[0]
+
+            # 유효하지 않은 행동 제거
+            mask = np.full(
+                self.nA,
+                -np.inf,
+                dtype=np.float32
+            )
+
+            mask[valid_actions] = 0.0
+
+            q = q + mask
+
+            return int(np.argmax(q))
     '''
     def act(self, s, valid_actions):
 
-        if np.random.rand() <= self.epsilon:
-            return random.choice(valid_actions)
+        valid_actions = np.asarray(
+            valid_actions,
+            dtype=np.int32
+        ).reshape(-1)
 
-        q = self.model.predict(self.sess, s)[0]
+        if len(valid_actions) == 0:
+            raise RuntimeError(
+                "Valid action이 없습니다."
+            )
 
-        mask = np.full(self.nA, -np.inf)
-        mask[valid_actions] = 0
+        # 탐험
+        if np.random.rand() < self.epsilon:
+            return int(
+                random.choice(
+                    valid_actions.tolist()
+                )
+            )
 
-        q = q + mask
+        # 상태
+        s = np.asarray(
+            s,
+            dtype=np.float32
+        ).reshape(1, -1)
 
-        return np.argmax(q)
-            
+        # Q값
+        q_values = self.model.predict(s)[0]
+
+        # valid action만 추출
+        valid_q_values = q_values[valid_actions]
+
+        # 가장 높은 Q값의 위치
+        best_index = np.argmax(
+            valid_q_values
+        )
+
+        # 실제 action 번호
+        return int(
+            valid_actions[best_index]
+        )
+ 
     def replay(self):
-        #메모리에서 랜덤 배치를 가져옴
-        batch = np.array(random.sample(self.memory.recall_memories(), self.batch_size))
-        #현재 상태의 시퀀스 가져옴
-        s = np.vstack(batch[:, 0])
-        
-        #행동 시퀀스 재현
-        a = np.array(batch[:, 1], dtype = int)
-        
-        #보상 재현
-        r = np.copy(batch[:, 2])
-        
-        #결과 상태의 시퀀스 재현
-        s_p = np.vstack(batch[:, 3])
-        
-        #보상이 최종 상태와 관련된 것인지 여부를 확인
-        status = np.where(batch[:, 4] == False)
-        
-        #우리 모델과 목표 모델의 보상을 예측하기 위해 모델을 사용
-        next_reward = self.model.predict(self.sess, s_p)
-        final_reward = self.target.model.predict(self.sess, s_p)
-        
-        if len(status[0]) > 0:
-            #목표 모델을 이용한 최종이 아닌 상태 업데이트 규칙
-            #보상이 최종 목표에서 비롯된 것이 아니면, 그 보상은 부분적인 것이다(r0)
-            #나머지를 더하고, 목표 예측을 사용해 최종 보상을 대체
-            best_next_action = np.argmax(nect_reward[status, :][0], axis = 1)
-            
-            #할인된 최종 보상을 더함
-            r[status] += np.multiply(self.gamma, final_reward[status, best_next_action][0])
-            
-        #관측된 행동과 보상을 다룰 때 행동에 대해 예측된 보상을 대체
-        expected_reward = self.model.predict(self.sess, s)
-        expected_reward [range(self.batch_size), a] = r
-        
-        #상태를 예측/관측된 보상에 대해 다시 적합시킴
-        self.model.fit(self.sess, s, expected_reward, epochs = self.epochs)
-        
+
+        if len(self.memory) < self.batch_size:
+            return
+
+        batch = self.memory.sample(
+            self.batch_size
+        )
+
+        states = np.array(
+            [x[0] for x in batch],
+            dtype=np.float32
+        )
+
+        actions = np.array(
+            [x[1] for x in batch],
+            dtype=np.int32
+        )
+
+        rewards = np.array(
+            [x[2] for x in batch],
+            dtype=np.float32
+        )
+
+        next_states = np.array(
+            [x[3] for x in batch],
+            dtype=np.float32
+        )
+
+        dones = np.array(
+            [x[4] for x in batch],
+            dtype=np.float32
+        )
+
+        # 현재 Q값
+        current_q = self.model.predict(
+            states
+        )
+
+        # 다음 상태의 Q값
+        next_q = self.target_model.predict(
+            next_states
+        )
+
+        # Bellman equation
+        max_next_q = np.max(
+            next_q,
+            axis=1
+        )
+
+        targets = rewards + (
+            1.0 - dones
+        ) * self.gamma * max_next_q
+
+        # 선택된 action의 Q값만 target으로 변경
+        current_q[
+            np.arange(self.batch_size),
+            actions
+        ] = targets
+
+        # 학습
+        self.model.fit(
+            states,
+            current_q
+        )
+    
     def get_valid_actions(self):
         return Quoridor.GetValidActions(self.Board)
         
-        
-
 class Environment:
     def __init__(self):
         #환경 초기화
-        self.Board = None
+        self.board = None
         self.done = False
         self.winner = None
         self.nA = 132 #보드의 상태에서 취할 수 있는 행동의 최대 가짓수
@@ -317,70 +423,215 @@ class Environment:
         state[:, :, 6] = self.board.WallCount[1] / 10.0 #P2 WallCount / 10
 
         return state.flatten() #nS = 9*9*7 = 567
-    
-    def step(self, action):
 
+    def step(self, action):
         if self.done:
             raise RuntimeError("Game is already finished.")
+
+        # 행동 전 최단경로
+        prev_p1_distance = Quoridor.AStar(self.board, True)
+        prev_p2_distance = Quoridor.AStar(self.board, False)
 
         # 행동 실행
         result = self.execute_action(action)
 
-        # 승패 확인
-        reward = self.calculate_reward()
+        # 행동 후 최단경로
+        new_p1_distance = Quoridor.AStar(self.board, True)
+        new_p2_distance = Quoridor.AStar(self.board, False)
 
-        # 종료 여부
+        # P2가 AI
+        # P2의 경로가 짧아지면 +
+        my_reward = prev_p2_distance - new_p2_distance
+
+        # P1의 경로가 길어지면 +
+        opponent_reward = new_p1_distance - prev_p1_distance
+
+        reward = (
+            0.5 * my_reward
+            + 0.5 * opponent_reward
+        )
+
+        # 승패 보상
+        winner = Quoridor.isGameOver(self.board)
+
+        if winner == 2:
+            reward += 10.0
+
+        elif winner == 1:
+            reward -= 10.0
+
         done = self.check_done()
 
         next_state = self.get_state()
 
         return next_state, reward, done
-    
-def execute_action(self, action):
 
-    # 이동
-    if action < 4:
+    def execute_action(self, action):
 
-        move = action
+        # 이동
+        if action < 4:
 
-        result = Quoridor.MovePlayer(
-            self.board,
-            move
-        ) #상,하,좌,우 이동
+            move = action
 
-    # 가로벽
-    elif action < 68:
+            result = Quoridor.MovePlayer(
+                self.board,
+                move
+            ) #상,하,좌,우 이동
 
-        wall_action = action - 4
+        # 가로벽
+        elif action < 68:
 
-        x = wall_action // 8
-        y = wall_action % 8
+            wall_action = action - 4
 
-        result = Quoridor.PlaceWallH(
-            self.board,
-            [x, y]
-        )
+            x = wall_action // 8
+            y = wall_action % 8
 
-    # 세로벽
-    else:
+            result = Quoridor.PlaceWallH(
+                self.board,
+                [x, y]
+            )
 
-        wall_action = action - 68
-
-        x = wall_action // 8
-        y = wall_action % 8
-
-        result = Quoridor.PlaceWallV(
-            self.board,
-            [x, y]
-        )
-
-    return result
-
-def calculate_reward(self):
-    winner = self.isGameOver
-    if winner != 0:
-        if winner == 1:
-            return -1.0 #패배(봇은 P2)
+        # 세로벽
         else:
-            return 1.0#승리(봇은 P2)
-    return 0.0
+
+            wall_action = action - 68
+
+            x = wall_action // 8
+            y = wall_action % 8
+
+            result = Quoridor.PlaceWallV(
+                self.board,
+                [x, y]
+            )
+
+        return result
+
+    def calculate_reward(self, prev_my_distance, prev_opponent_distance):
+        winner = Quoridor.isGameOver(self.board)
+
+        # 승패 보상
+        if winner == 2:
+            return 10.0   # P2 승리
+
+        elif winner == 1:
+            return -10.0  # P2 패배
+
+        # 현재 최단 경로
+        my_distance = Quoridor.AStar(self.board, 2)
+        opponent_distance = Quoridor.AStar(self.board, 1)
+
+        # 내 경로가 줄어든 만큼 보상
+        my_reward = prev_my_distance - my_distance
+
+        # 상대 경로가 늘어난 만큼 보상
+        opponent_reward = opponent_distance - prev_opponent_distance
+
+        # 가중치
+        reward = (
+            0.5 * my_reward
+            + 0.5 * opponent_reward
+        )
+
+        return reward
+
+    def check_done(self):
+        winner = Quoridor.isGameOver(self.board)
+        if winner != 0:
+            self.winner = winner
+            self.done = True
+            return True
+        return False
+    
+    def get_valid_actions(self):
+        return tuple(Quoridor.GetValidActions(self.board))
+    
+    
+#####################################################################################################
+env = Environment()
+
+agent = DQNAgent(nS=567, nA=132, experiment_dir="./TESLA_Quoridor_AI")
+
+EPISODES = 20
+for episode in range(EPISODES):
+    print(f"\n===== Episode {episode} 시작 =====", flush=True)
+    if (episode + 1) % 10 == 0:
+        save_path = (
+            f"./TESLA_Quoridor_AI/"
+            f"dqn_episode_{episode + 1}.weights.h5"
+        )
+
+        agent.model.model.save_weights(
+            save_path
+        )
+
+        print(
+            f"모델 저장 완료: {save_path}",
+            flush=True
+        )
+
+    state = env.reset()
+
+    total_reward = 0
+    step_count = 0
+
+    while True:
+        #if step_count % 10 == 0:
+            #print(f"Episode {episode}, step {step_count}",flush=True)
+
+        valid_actions = env.get_valid_actions()
+
+        #print("valid actions:", valid_actions, flush=True)
+
+        action = agent.act(
+            state,
+            valid_actions
+        )
+
+        #print("action:", action, flush=True)
+
+        next_state, reward, done = env.step(action)
+
+        #print(f"reward={reward}, done={done}",flush=True)
+
+        agent.memory.add_memory(
+            state,
+            action,
+            reward,
+            next_state,
+            done
+        )
+
+        state = next_state
+
+        total_reward += reward
+        step_count += 1
+
+        agent.replay()
+
+        if done:
+            break
+
+        # 임시 안전장치
+        if step_count >= 200:
+            print(
+                "200 step 초과, episode 강제종료",
+                flush=True
+            )
+            break
+        
+        
+
+    if agent.epsilon > agent.epsilon_min:
+        agent.epsilon *= agent.epsilon_decay
+
+    if episode % 10 == 0:
+        agent.update_target_model()
+
+    print(
+        f"Episode: {episode} | "
+        f"Reward: {total_reward} | "
+        f"Epsilon: {agent.epsilon:.4f} | "
+        f"Steps: {step_count}",
+        flush=True
+    )
+    

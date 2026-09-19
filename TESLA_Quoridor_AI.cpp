@@ -5,6 +5,7 @@
 #include <queue>
 #include <array>
 
+#include <stdexcept> // std::out_of_range를 사용하기 위해 필수
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -70,7 +71,7 @@ struct Quoridor
 						}
 						else {
 							//세로벽
-							if ((this->Path[i / 2][j / 2][3] == 0) && (this->Path[i / 2][j / 2 + 1][2] == 0)) {
+							if ((this->Path.at(i / 2).at(j / 2).at(3) == 0) && (this->Path.at(i / 2).at(j / 2 + 1).at(2) == 0)) {
 								//벽 존재
 								printf("|");
 								continue;
@@ -168,7 +169,7 @@ int AStar_MakeChildNode(Quoridor* Board, std::priority_queue<AStar_Node>* AStar_
 	return 0;
 }
 
-int AStar(Quoridor* Board) {
+int AStar(Quoridor* Board, bool isP1Turn) {
 	/*
 	지금 차례의 플레이어가 목적지로 갈때까지의 거리 반환
 	목적지로 도달하는 것이 불가능하다면, -1 반환
@@ -176,7 +177,7 @@ int AStar(Quoridor* Board) {
 
 	std::priority_queue<AStar_Node> AStar_Nodes; //열린 리스트 선언
 	std::vector<std::array<uint8_t, 2>> AStar_ClosedNodes; //닫힌 리스트 선언(닫힌 리스트는 비용 고려를 할 필요가 없으니, 벡터 행렬로 압축
-	int Destination = Board->isP1Turn ? 0 : 8; // 목적지 설정
+	int Destination = isP1Turn ? 0 : 8; // 목적지 설정
 	struct AStar_Node RootNode = { 0, };
 	RootNode.Position[0] = Board->isP1Turn ? Board->P1[0] : Board->P2[0]; // 루트 노드 위치 (플레이어의 위치)
 	RootNode.Position[1] = Board->isP1Turn ? Board->P1[1] : Board->P2[1];
@@ -200,9 +201,9 @@ int AStar(Quoridor* Board) {
 
 bool isConnected(Quoridor Board) {
 	//보드에서 두 플레이어 모두 목적지로 가는 것이 가능한지 체크
-	if (AStar(&Board) != -1) {
+	if (AStar(&Board, Board.isP1Turn) != -1) {
 		Board.isP1Turn = !Board.isP1Turn; //상대방도 연결되어있는지 체크
-		if (AStar(&Board) != -1) {
+		if (AStar(&Board, Board.isP1Turn) != -1) {
 			return true;
 		}
 	}
@@ -335,10 +336,10 @@ bool canPlaceWallV(Quoridor* Board, std::array<uint8_t, 2> GridPos) {
 	Quoridor tempBoard = *Board;
 	//Path 업데이트
 	try {
-		(tempBoard.Path)[GridPos.at(0)][GridPos.at(1) + 1][2] = false;
-		(tempBoard.Path)[GridPos.at(0) + 1][GridPos.at(1) + 1][2] = false;
-		(tempBoard.Path)[GridPos.at(0)][GridPos.at(1)][3] = false;
-		(tempBoard.Path)[GridPos.at(0) + 1][GridPos.at(1)][3] = false;
+		tempBoard.Path.at(GridPos.at(0)).at(GridPos.at(1) + 1).at(2) = false;
+		tempBoard.Path.at(GridPos.at(0) + 1).at(GridPos.at(1) + 1).at(2) = false;
+		tempBoard.Path.at(GridPos.at(0)).at(GridPos.at(1)).at(3) = false;
+		tempBoard.Path.at(GridPos.at(0) + 1).at(GridPos.at(1)).at(3) = false;
 	}
 	catch (std::out_of_range) {
 		return false;
@@ -454,22 +455,25 @@ std::vector<int> GetValidActions(Quoridor* Board) {
 	std::array<uint8_t, 2> Player = Board->isP1Turn ? Board->P1 : Board->P2;
 	std::vector<int> ValidActions;
 	for (int i = 0; i < 4; i++) {
-		if (!canMovePlayer(Board, i)) {
+		if (canMovePlayer(Board, i)) {
 			//이동 가능
 			ValidActions.emplace_back(i);
+			//printf("Move Possible: %d\n", i);
 		}
 	}
 	std::array<uint8_t, 2> GridPos = { 0,0 };
 	for (uint8_t i = 0; i < 64; i++) {
 		GridPos.at(0) = i / 8;
 		GridPos.at(1) = i % 8;
-		if (!canPlaceWallH(Board, GridPos)) {
+		if (canPlaceWallH(Board, GridPos)) {
 			//가로벽 설치 가능
 			ValidActions.emplace_back(i + 4);
+			//printf("WallPLaceH Possible: %d\n", i + 4);
 		}
-		if (!canPlaceWallV(Board, GridPos)) {
+		if (canPlaceWallV(Board, GridPos)) {
 			//세로벽 설치 가능
 			ValidActions.emplace_back(i + 68);
+			//printf("WallPLaceVt Possible: %d\n", i + 68);
 		}
 	}
 	return ValidActions;
@@ -491,7 +495,7 @@ int main() {
 		PlaceWallH(&Board, GridWallPos);
 	}
 	//PlaceWallVt(&Board, V2);
-	printf("Distance: %d\n\n", AStar(&Board));
+	printf("Distance: %d\n\n", AStar(&Board, Board.isP1Turn));
 	Board.PrintBoard();
 	/*
 
