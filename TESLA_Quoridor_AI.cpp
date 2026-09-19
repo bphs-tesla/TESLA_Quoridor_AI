@@ -428,6 +428,19 @@ int MovePlayer(Quoridor* Board, uint8_t Move) {
 	return 1; //예외처리
 }
 
+int isGameOver(Quoridor* Board) {
+	//게임 끝났는지 알려주는 함수(이거는 파이썬 가독성&속도 위한거라 별거 없음)
+	if (Board->P1.at(0) == 0) {
+		return 1;
+	}
+	else if (Board->P2.at(0) == 8) {
+		return 2;
+	}
+	else {
+		return 0;
+	}
+}
+
 int main() {
 	struct Quoridor Board;
 	std::array<uint8_t, 2> H = { 2,7 };
@@ -534,4 +547,5 @@ PYBIND11_MODULE(Quoridor, m) {
 	m.def("PrintBoard", &Quoridor::PrintBoard, "prints current Board");
 	m.def("MovePlayer", &MovePlayer, "moves player");
 	m.def("AStar", &AStar, "finds the distance between Player and destination");
+	m.def("isGameOver", &isGameOver, "checks if the game is over and returns the winner");
 }
