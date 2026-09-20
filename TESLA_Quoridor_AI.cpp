@@ -179,8 +179,9 @@ int AStar(Quoridor* Board, bool isP1Turn) {
 	std::vector<std::array<uint8_t, 2>> AStar_ClosedNodes; //닫힌 리스트 선언(닫힌 리스트는 비용 고려를 할 필요가 없으니, 벡터 행렬로 압축
 	int Destination = isP1Turn ? 0 : 8; // 목적지 설정
 	struct AStar_Node RootNode = { 0, };
-	RootNode.Position[0] = Board->isP1Turn ? Board->P1[0] : Board->P2[0]; // 루트 노드 위치 (플레이어의 위치)
-	RootNode.Position[1] = Board->isP1Turn ? Board->P1[1] : Board->P2[1];
+	if (RootNode.Position[0] == Destination) { return 0; } //바로 도착
+	RootNode.Position[0] = isP1Turn ? Board->P1[0] : Board->P2[0]; // 루트 노드 위치 (플레이어의 위치)
+	RootNode.Position[1] = isP1Turn ? Board->P1[1] : Board->P2[1];
 
 	RootNode.HeuristicCost = AStar_HeuristicCost(&RootNode, Destination); //루트 노드 휴리스틱
 	RootNode.AccumulatedCost = 0; //루트 노드라서 누적 비용 = 0
@@ -202,8 +203,8 @@ int AStar(Quoridor* Board, bool isP1Turn) {
 bool isConnected(Quoridor Board) {
 	//보드에서 두 플레이어 모두 목적지로 가는 것이 가능한지 체크
 	if (AStar(&Board, Board.isP1Turn) != -1) {
-		Board.isP1Turn = !Board.isP1Turn; //상대방도 연결되어있는지 체크
-		if (AStar(&Board, Board.isP1Turn) != -1) {
+		//Board.isP1Turn = !Board.isP1Turn; //상대방도 연결되어있는지 체크
+		if (AStar(&Board, !Board.isP1Turn) != -1) {
 			return true;
 		}
 	}
@@ -376,6 +377,8 @@ int PlaceWallH(Quoridor* Board, std::array<uint8_t, 2> GridPos) {
 		(Board->Path).at(GridPos.at(0) + 1).at(GridPos.at(1) + 1).at(0) = false;
 		(Board->Path).at(GridPos.at(0)).at(GridPos.at(1)).at(1) = false;
 		(Board->Path).at(GridPos.at(0)).at(GridPos.at(1) + 1).at(1) = false;
+		uint8_t Player = Board->isP1Turn ? 0 : 1; 
+		Board->WallCount[Player]--;
 		PassTurn(Board);
 		return 0; //정상적으로 Path & WallH 업데이트
 	}
@@ -395,6 +398,8 @@ int PlaceWallV(Quoridor* Board, std::array<uint8_t, 2> GridPos) {
 		(Board->Path).at(GridPos.at(0) + 1).at(GridPos.at(1) + 1).at(2) = false;
 		(Board->Path).at(GridPos.at(0)).at(GridPos.at(1)).at(3) = false;
 		(Board->Path).at(GridPos.at(0) + 1).at(GridPos.at(1)).at(3) = false;
+		uint8_t Player = Board->isP1Turn ? 0 : 1; 
+		Board->WallCount[Player]--;
 		PassTurn(Board);
 		return 0; //정상적으로 Path & WallV 업데이트
 	}
@@ -452,7 +457,10 @@ int isGameOver(Quoridor* Board) {
 }
 
 std::vector<int> GetValidActions(Quoridor* Board) {
-	std::array<uint8_t, 2> Player = Board->isP1Turn ? Board->P1 : Board->P2;
+	//std::array<uint8_t, 2> Player = Board->isP1Turn ? Board->P1 : Board->P2;
+	int MoveCount = 0;
+	int WallHCount = 0;
+	int WallVCount = 0;
 	std::vector<int> ValidActions;
 	for (int i = 0; i < 4; i++) {
 		if (canMovePlayer(Board, i)) {
@@ -476,6 +484,55 @@ std::vector<int> GetValidActions(Quoridor* Board) {
 			//printf("WallPLaceVt Possible: %d\n", i + 68);
 		}
 	}
+
+    if (ValidActions.empty()) {
+		Board->PrintBoard();
+        printf("\n");
+        printf("========== NO VALID ACTION ==========\n");
+
+        printf("Turn: P%d\n",
+            Board->isP1Turn ? 1 : 2);
+
+        printf("P1: (%d, %d)\n",
+            Board->P1[0],
+            Board->P1[1]);
+
+        printf("P2: (%d, %d)\n",
+            Board->P2[0],
+            Board->P2[1]);
+
+        printf("WallCount: P1=%d P2=%d\n",
+            Board->WallCount[0],
+            Board->WallCount[1]);
+
+        printf("MoveCount = %d\n", MoveCount);
+        printf("WallHCount = %d\n", WallHCount);
+        printf("WallVCount = %d\n", WallVCount);
+
+        printf("Path around current player:\n");
+
+        std::array<uint8_t, 2> Player =
+            Board->isP1Turn ? Board->P1 : Board->P2;
+
+        printf("Position = (%d, %d)\n",
+            Player[0],
+            Player[1]);
+
+        printf("Path[up]    = %d\n",
+            Board->Path[Player[0]][Player[1]][0]);
+
+        printf("Path[down]  = %d\n",
+            Board->Path[Player[0]][Player[1]][1]);
+
+        printf("Path[left]  = %d\n",
+            Board->Path[Player[0]][Player[1]][2]);
+
+        printf("Path[right] = %d\n",
+            Board->Path[Player[0]][Player[1]][3]);
+
+        printf("=====================================\n\n");
+    }
+
 	return ValidActions;
 }
 

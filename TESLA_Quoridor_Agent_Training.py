@@ -167,7 +167,7 @@ class DQNAgent:
 
         self.epsilon = 1.0
         self.epsilon_min = 0.01
-        self.epsilon_decay = 0.998
+        self.epsilon_decay = 0.9998
 
         self.gamma = 0.99
 
@@ -245,8 +245,19 @@ class DQNAgent:
         ).reshape(-1)
 
         if len(valid_actions) == 0:
+            print("\n========== NO VALID ACTION ==========")
+            print(f"Environment: {i}")
+            print(f"Board turn: {'P1' if env.board.isP1Turn else 'P2'}")
+            print(f"P1 position: {env.board.P1}")
+            print(f"P2 position: {env.board.P2}")
+            print(f"P1 walls: {env.board.WallCount[0]}")
+            print(f"P2 walls: {env.board.WallCount[1]}")
+            print(f"State shape: {states[i].shape}")
+            print(f"State min/max: {states[i].min()} / {states[i].max()}")
+            print("====================================\n")
+
             raise RuntimeError(
-                "Valid action이 없습니다."
+                f"환경 {i}: Valid action이 없습니다."
             )
 
         # 탐험
@@ -355,8 +366,9 @@ class DQNAgent:
             )
 
         return actions
-
+    
     def replay(self):
+
         if len(self.memory) < self.batch_size:
             return
 
@@ -399,46 +411,16 @@ class DQNAgent:
             )
         )
 
-        current_q = self.model.model(
-            states,
-            training=False
-        )
-
-        next_q = self.target_model.model(
-            next_states,
-            training=False
-        )
-
-        max_next_q = tf.reduce_max(
-            next_q,
-            axis=1
-        )
-
-        targets = (
-            rewards
-            + (1.0 - dones)
-            * self.gamma
-            * max_next_q
-        )
-
-        action_mask = tf.one_hot(
-            actions,
-            self.nA
-        )
-
-        target_q = (
-            current_q * (1.0 - action_mask)
-            + tf.expand_dims(targets, 1) * action_mask
-        )
-
-        self.train_step(
+        loss = self.train_step(
             states,
             actions,
             rewards,
             next_states,
             dones
         )
-        
+
+        return loss
+            
     def get_valid_actions(self):
         return Quoridor.GetValidActions(self.Board)
     
@@ -469,7 +451,7 @@ class DQNAgent:
 
             targets = (
                 rewards
-                + (1.0 - dones)
+                - (1.0 - dones)
                 * self.gamma
                 * max_next_q
             )
@@ -505,13 +487,13 @@ class DQNAgent:
     
         
 class Environment:
-    def __init__(self):
+    def __init__(self, debug = False):
         #환경 초기화
         self.board = None
         self.done = False
         self.winner = None
         self.nA = 132 #보드의 상태에서 취할 수 있는 행동의 최대 가짓수
-        self.debug = False
+        self.debug = debug
         
     def reset(self):
             self.board = Quoridor.Quoridor()
@@ -533,204 +515,188 @@ class Environment:
             return self.get_state()
         
     def get_state(self):
+        state = np.zeros(
+            (9, 9, 7),
+            dtype=np.float32
+        )
 
-        state = np.zeros((9, 9, 7), dtype=np.float32)
+        # =========================================================
+        # 현재 플레이어 기준으로 state를 표현
+        # =========================================================
 
-        # P1
-        state[self.board.P1[0], self.board.P1[1], 0] = 1.0
-
-        # P2
-        state[self.board.P2[0], self.board.P2[1], 1] = 1.0
-
-        # Horizontal walls
-        for x in range(8):
-            for y in range(8):
-                if self.board.WallH[x] & (1 << y):
-                    state[x, y, 2] = 1.0
-
-        # Vertical walls (transposed)
-        for x in range(8):
-            for y in range(8):
-                if self.board.WallVt[y] & (1 << x):
-                    state[x, y, 3] = 1.0
-
-        # Turn
         if self.board.isP1Turn:
-            state[:, :, 4] = 1.0
+
+            # 나 = P1
+            my_pos = self.board.P1
+            opponent_pos = self.board.P2
+
+            my_walls = self.board.WallCount[0]
+            opponent_walls = self.board.WallCount[1]
+
         else:
-            state[:, :, 4] = -1.0
 
-        # Remaining walls
-        state[:, :, 5] = self.board.WallCount[0] / 10.0 #P1 WallCount / 10
-        state[:, :, 6] = self.board.WallCount[1] / 10.0 #P2 WallCount / 10
+            # 나 = P2
+            my_pos = self.board.P2
+            opponent_pos = self.board.P1
 
-        return state.flatten() #nS = 9*9*7 = 567
-    '''
+            my_walls = self.board.WallCount[1]
+            opponent_walls = self.board.WallCount[0]
+
+
+        # =========================================================
+        # 현재 플레이어
+        # =========================================================
+
+        state[
+            my_pos[0],
+            my_pos[1],
+            0
+        ] = 1.0
+
+
+        # =========================================================
+        # 상대 플레이어
+        # =========================================================
+
+        state[
+            opponent_pos[0],
+            opponent_pos[1],
+            1
+        ] = 1.0
+
+
+        # =========================================================
+        # Horizontal walls
+        # =========================================================
+
+        for x in range(8):
+
+            for y in range(8):
+
+                if self.board.WallH[x] & (1 << y):
+
+                    state[
+                        x,
+                        y,
+                        2
+                    ] = 1.0
+
+
+        # =========================================================
+        # Vertical walls
+        # =========================================================
+
+        for x in range(8):
+
+            for y in range(8):
+
+                if self.board.WallVt[y] & (1 << x):
+
+                    state[
+                        x,
+                        y,
+                        3
+                    ] = 1.0
+
+
+        # =========================================================
+        # Turn
+        #
+        # 현재 플레이어 관점이므로 항상 1
+        # =========================================================
+
+        state[:, :, 4] = 1.0
+
+
+        # =========================================================
+        # Wall count
+        # =========================================================
+
+        state[:, :, 5] = (
+            my_walls / 10.0
+        )
+
+        state[:, :, 6] = (
+            opponent_walls / 10.0
+        )
+
+
+        return state.flatten()
     def step(self, action):
-        if self.done:
-            raise RuntimeError("Game is already finished.")
+        acting_player = 1 if self.board.isP1Turn else 2
 
-        # 행동 전 최단경로
-        prev_p1_distance = Quoridor.AStar(self.board, True)
-        prev_p2_distance = Quoridor.AStar(self.board, False)
+        # 행동 전
+        prev_p1_distance = self.p1_distance
+        prev_p2_distance = self.p2_distance
 
         # 행동 실행
-        result = self.execute_action(action)
-
-        # 행동 후 최단경로
-        new_p1_distance = Quoridor.AStar(self.board, True)
-        new_p2_distance = Quoridor.AStar(self.board, False)
-
-        # P2가 AI
-        # P2의 경로가 짧아지면 +
-        my_reward = prev_p2_distance - new_p2_distance
-
-        # P1의 경로가 길어지면 +
-        opponent_reward = new_p1_distance - prev_p1_distance
-
-        reward = (
-            0.5 * my_reward
-            + 0.5 * opponent_reward
-        )
-
-        # 승패 보상
-        winner = Quoridor.isGameOver(self.board)
-
-        if winner == 2:
-            reward += 10.0
-
-        elif winner == 1:
-            reward -= 10.0
-
-        done = self.check_done()
-
-        next_state = self.get_state()
-
-        return next_state, reward, done
-    
-    def step(self, action):
-        t0 = time.perf_counter()
-
-        prev_p1_distance = Quoridor.AStar(
-            self.board, True
-        )
-
-        prev_p2_distance = Quoridor.AStar(
-            self.board, False
-        )
-
-        t1 = time.perf_counter()
-
         self.execute_action(action)
 
-        t2 = time.perf_counter()
-
-        new_p1_distance = Quoridor.AStar(
-            self.board, True
+        # 행동 후
+        self.p1_distance = Quoridor.AStar(
+            self.board,
+            True
         )
 
-        new_p2_distance = Quoridor.AStar(
-            self.board, False
+        self.p2_distance = Quoridor.AStar(
+            self.board,
+            False
         )
 
-        t3 = time.perf_counter()
+        # 변화량
+        p1_progress = (
+            prev_p1_distance - self.p1_distance
+        )
 
+        p2_progress = (
+            prev_p2_distance - self.p2_distance
+        )
+
+        # 보상
+        if acting_player == 1:
+
+            reward = (
+                0.5 * p1_progress
+                + 0.5 * (-p2_progress)
+            )
+
+        else:
+
+            reward = (
+                0.5 * p2_progress
+                + 0.5 * (-p1_progress)
+            )
+
+        # 게임 종료
         winner = Quoridor.isGameOver(
             self.board
         )
 
-        t4 = time.perf_counter()
-
-        # P2가 얻은 보상
-        my_reward = (
-            prev_p2_distance
-            - new_p2_distance
-        )
-
-        # P1의 경로가 길어지면 보상
-        opponent_reward = (
-            new_p1_distance
-            - prev_p1_distance
-        )
-
-        reward = (
-            0.5 * my_reward
-            + 0.5 * opponent_reward
-        )
-
-        if winner == 2:
-            reward += 10.0
-        elif winner == 1:
-            reward -= 10.0
-
-        done = (winner != 0)
-
-        if done:
-            self.winner = winner
-            self.done = True
-
-        next_state = self.get_state()
-
-        t5 = time.perf_counter()
-
-        if self.debug:
-            print(
-                f"[TIME] "
-                f"A*={t3-t0:.5f}s "
-                f"action={t2-t1:.5f}s "
-                f"gameover={t4-t3:.5f}s "
-                f"state={t5-t4:.5f}s",
-                flush=True
-            )
-
-        return next_state, reward, done
-    '''
-    def step(self, action):
-
-        # 이전 거리
-        prev_p1_distance = self.p1_distance
-        prev_p2_distance = self.p2_distance
-
-        # 행동
-        self.execute_action(action)
-
-        # 새 보드에서 딱 2번만 A*
-        self.p1_distance = Quoridor.AStar(
-            self.board, True
-        )
-
-        self.p2_distance = Quoridor.AStar(
-            self.board, False
-        )
-
-        # 보상
-        my_reward = (
-            prev_p2_distance
-            - self.p2_distance
-        )
-
-        opponent_reward = (
-            self.p1_distance
-            - prev_p1_distance
-        )
-
-        reward = (
-            0.5 * my_reward
-            + 0.5 * opponent_reward
-        )
-
-        winner = Quoridor.isGameOver(self.board)
-
-        if winner == 2:
-            reward += 10.0
-        elif winner == 1:
-            reward -= 10.0
-
         done = winner != 0
 
         if done:
+
+            if winner == acting_player:
+                reward += 10.0
+            else:
+                reward -= 10.0
+
             self.winner = winner
             self.done = True
+
+        # 디버깅
+        if self.debug:
+
+            print(
+                f"P{acting_player} | "
+                f"Action={action} | "
+                f"P1: {prev_p1_distance}->{self.p1_distance} | "
+                f"P2: {prev_p2_distance}->{self.p2_distance} | "
+                f"P1 progress={p1_progress:+d} | "
+                f"P2 progress={p2_progress:+d} | "
+                f"Reward={reward:+.2f}",
+                flush=True
+            )
 
         next_state = self.get_state()
 
@@ -790,124 +756,24 @@ class Environment:
     
 #####################################################################################################
 
-'''
-env = Environment()
-
-agent = DQNAgent(nS=567, nA=132, experiment_dir="./TESLA_Quoridor_AI")
-
-EPISODES = 10000
-total_training_steps = 0
-for episode in range(EPISODES):
-    print(f"\n===== Episode {episode} 시작 =====", flush=True)
-
-    state = env.reset()
-
-    total_reward = 0
-    step_count = 0
-
-
-    while True:
-        #if step_count % 10 == 0:
-            #print(f"Episode {episode}, step {step_count}",flush=True)
-
-        valid_actions = env.get_valid_actions()
-
-        #print("valid actions:", valid_actions, flush=True)
-
-        if env.board.isP1Turn:
-
-            # P1 = 상대
-            #valid_actions = env.get_valid_actions()
-
-            action = random.choice(
-                valid_actions
-            )
-
-        else:
-
-            # P2 = DQN
-            #valid_actions = env.get_valid_actions()
-
-            action = agent.act(state,valid_actions)
-            
-
-        #print("action:", action, flush=True)
-
-        next_state, reward, done = env.step(action)
-
-        #print(f"reward={reward}, done={done}",flush=True)
-
-        agent.memory.add_memory(
-            state,
-            action,
-            reward,
-            next_state,
-            done
-        )
-
-        state = next_state
-
-        total_reward += reward
-        step_count += 1
-        total_training_steps += 1
-        
-        if step_count % 4 == 0:
-            agent.replay()
-            
-        if total_training_steps % 1000 == 0:
-            agent.update_target_model()
-            
-        if done:
-            break
-
-
-        # 임시 안전장치
-        if step_count >= 200:
-            print(
-                "200 step 초과, episode 강제종료",
-                flush=True
-            )
-            break
-        
-        
-
-    if agent.epsilon > agent.epsilon_min:
-        agent.epsilon *= agent.epsilon_decay
-        
-    print(
-        f"Episode: {episode} | "
-        f"Reward: {total_reward} | "
-        f"Epsilon: {agent.epsilon:.4f} | "
-        f"Steps: {step_count}",
-        flush=True
-    )
-    if (episode + 1) % 10 == 0:
-        save_path = (
-            f"./TESLA_Quoridor_AI/"
-            f"dqn_episode_{episode + 1}.weights.h5"
-        )
-
-        agent.model.model.save_weights(
-            save_path
-        )
-
-        print(
-            f"모델 저장 완료: {save_path}",
-            flush=True
-        )
-
-'''
 ######################################################################
 # Parallel environments
+######################################################################
+
+######################################################################
+# Parallel Training
+######################################################################
+
+######################################################################
+# Parallel Self-Play Training
 ######################################################################
 
 NUM_ENVS = 128
 
 envs = [
-    Environment()
+    Environment(debug=False)
     for _ in range(NUM_ENVS)
 ]
-
 
 agent = DQNAgent(
     nS=567,
@@ -915,25 +781,28 @@ agent = DQNAgent(
     experiment_dir="./TESLA_Quoridor_AI"
 )
 
+EPISODES = 50000
 
-EPISODES = 10000
+# ============================================================
+# 학습 시간 측정
+# ============================================================
+
+training_start_time = time.time()
 
 total_training_steps = 0
+finished_episodes = 0
 
-episode_rewards = np.zeros(
-    NUM_ENVS,
-    dtype=np.float32
-)
+last_saved_episode = 0
+
+episode_rewards = np.zeros(NUM_ENVS, dtype=np.float32)
+
+episode_p1_rewards = np.zeros(NUM_ENVS, dtype=np.float32)
+episode_p2_rewards = np.zeros(NUM_ENVS, dtype=np.float32)
 
 episode_steps = np.zeros(
     NUM_ENVS,
     dtype=np.int32
 )
-
-episode_numbers = np.arange(
-    NUM_ENVS
-)
-
 
 ######################################################################
 # 초기화
@@ -943,114 +812,67 @@ states = []
 
 for env in envs:
 
-    state = env.reset()
-
     states.append(
-        state
+        env.reset()
     )
 
 
 ######################################################################
-# Parallel Training
+# Self-play
 ######################################################################
-
-finished_episodes = 0
 
 while finished_episodes < EPISODES:
 
     ##################################################################
-    # 모든 환경이 P2 차례가 되도록 만든다.
-    #
-    # 처음에는 P1 차례이므로 랜덤 P1 행동을 한 번 실행한다.
+    # 현재 살아있는 모든 환경을 모음
     ##################################################################
+
+    active_indices = []
+    active_states = []
+    active_valid_actions = []
 
     for i, env in enumerate(envs):
 
         if env.done:
             continue
 
-        if env.board.isP1Turn:
+        active_indices.append(i)
 
-            valid_actions = env.get_valid_actions()
+        active_states.append(
+            states[i]
+        )
 
-            action = random.choice(
-                valid_actions
-            )
-
-            _, _, done = env.step(
-                action
-            )
-
-            # P1이 게임을 끝냈다면
-            # 해당 게임은 다음 loop에서 reset
-            if done:
-
-                episode_rewards[i] = 0
-                episode_steps[i] = 0
-
-                states[i] = env.reset()
+        active_valid_actions.append(
+            env.get_valid_actions()
+        )
 
 
     ##################################################################
-    # 이제 P2 차례인 환경들을 모은다.
+    # 동시에 DQN으로 행동 결정
     ##################################################################
 
-    p2_indices = []
-
-    p2_states = []
-
-    p2_valid_actions = []
-
-    for i, env in enumerate(envs):
-
-        if env.done:
-            continue
-
-        if not env.board.isP1Turn:
-
-            p2_indices.append(i)
-
-            p2_states.append(
-                states[i]
-            )
-
-            p2_valid_actions.append(
-                env.get_valid_actions()
-            )
-
-
-    ##################################################################
-    # P2가 하나도 없다면 다시 진행
-    ##################################################################
-
-    if len(p2_indices) == 0:
-
+    if len(active_indices) == 0:
         continue
 
-
-    ##################################################################
-    # ⭐ 핵심
-    #
-    # 여러 환경의 상태를 한 번에 GPU에 넣는다.
-    ##################################################################
-
     actions = agent.act_batch(
-        p2_states,
-        p2_valid_actions
+        active_states,
+        active_valid_actions
     )
 
 
     ##################################################################
-    # P2 행동 실행
+    # 각 환경에서 행동 실행
     ##################################################################
 
     for batch_index, env_index in enumerate(
-        p2_indices
+        active_indices
     ):
 
-        env = envs[env_index]
+        env = envs[
+            env_index
+        ]
 
-        old_state = states[
+        state = states[
             env_index
         ].copy()
 
@@ -1058,13 +880,64 @@ while finished_episodes < EPISODES:
             batch_index
         ]
 
+
+        ##################################################################
+        # 행동한 플레이어 확인
+        ##################################################################
+
+        acting_player = 1 if env.board.isP1Turn else 2
+
+
+        ##################################################################
+        # 행동
+        ##################################################################
+
         next_state, reward, done = env.step(
             action
         )
 
+
+        ##################################################################
+        # 에피소드 보상 누적
+        ##################################################################
+
+        # 전체 보상
         episode_rewards[
             env_index
         ] += reward
+
+        # 플레이어별 보상
+        if acting_player == 1:
+
+            episode_p1_rewards[
+                env_index
+            ] += reward
+
+        else:
+
+            episode_p2_rewards[
+                env_index
+            ] += reward
+
+
+        ##################################################################
+        # Replay Memory
+        ##################################################################
+
+        agent.memory.add_memory(
+            state,
+            action,
+            reward,
+            next_state,
+            done
+        )
+        ##################################################################
+        # 상태 업데이트
+        ##################################################################
+
+        states[
+            env_index
+        ] = next_state
 
         episode_steps[
             env_index
@@ -1074,170 +947,12 @@ while finished_episodes < EPISODES:
 
 
         ##################################################################
-        # P2가 바로 승리한 경우
-        ##################################################################
-
-        if done:
-
-            agent.memory.add_memory(
-                old_state,
-                action,
-                reward,
-                next_state,
-                True
-            )
-
-            ##################################################################
-            # Episode 종료
-            ##################################################################
-
-            finished_episodes += 1
-
-            print(
-                f"Episode: {finished_episodes} | "
-                f"Reward: {episode_rewards[env_index]:.2f} | "
-                f"Steps: {episode_steps[env_index]} | "
-                f"Epsilon: {agent.epsilon:.4f}",
-                flush=True
-            )
-
-
-            ##################################################################
-            # 새로운 게임 시작
-            ##################################################################
-
-            states[
-                env_index
-            ] = env.reset()
-
-            episode_rewards[
-                env_index
-            ] = 0
-
-            episode_steps[
-                env_index
-            ] = 0
-
-            continue
-
-
-        ##################################################################
-        # P2가 행동한 직후에는 P1 차례
-        ##################################################################
-
-        p1_valid_actions = env.get_valid_actions()
-
-        p1_action = random.choice(
-            p1_valid_actions
-        )
-
-        p1_next_state, p1_reward, p1_done = env.step(
-            p1_action
-        )
-
-
-        ##################################################################
-        # P1이 이겨서 게임이 끝난 경우
-        ##################################################################
-
-        if p1_done:
-
-            total_reward = (
-                reward
-                +
-                p1_reward
-            )
-
-            agent.memory.add_memory(
-                old_state,
-                action,
-                total_reward,
-                p1_next_state,
-                True
-            )
-
-            episode_rewards[
-                env_index
-            ] += p1_reward
-
-
-            finished_episodes += 1
-
-            print(
-                f"Episode: {finished_episodes} | "
-                f"Reward: {episode_rewards[env_index]:.2f} | "
-                f"Steps: {episode_steps[env_index]} | "
-                f"Epsilon: {agent.epsilon:.4f}",
-                flush=True
-            )
-
-
-            ##################################################################
-            # 새로운 게임
-            ##################################################################
-
-            states[
-                env_index
-            ] = env.reset()
-
-            episode_rewards[
-                env_index
-            ] = 0
-
-            episode_steps[
-                env_index
-            ] = 0
-
-            continue
-
-
-        ##################################################################
-        # ⭐ 정상적인 P2 transition
-        #
-        # P2 상태
-        #   ↓
-        # P2 행동
-        #   ↓
-        # P1 랜덤 행동
-        #   ↓
-        # 다음 P2 상태
-        ##################################################################
-
-        total_reward = (
-            reward
-            +
-            p1_reward
-        )
-
-        agent.memory.add_memory(
-            old_state,
-            action,
-            total_reward,
-            p1_next_state,
-            False
-        )
-
-
-        ##################################################################
-        # 다음 P2 상태 저장
-        ##################################################################
-
-        states[
-            env_index
-        ] = p1_next_state
-
-        episode_rewards[
-            env_index
-        ] += p1_reward
-
-
-        ##################################################################
         # Replay
         ##################################################################
 
         if total_training_steps % 4 == 0:
 
-            agent.replay()
+            loss = agent.replay()
 
 
         ##################################################################
@@ -1258,19 +973,158 @@ while finished_episodes < EPISODES:
 
 
         ##################################################################
-        # 최대 step 제한
+        # Episode 종료
         ##################################################################
 
-        if episode_steps[
-            env_index
-        ] >= 200:
-
+        if done:
+            ##################################################################
+            # 모델 저장
+            ##################################################################
             finished_episodes += 1
+            elapsed_time = time.time() - training_start_time
+
+            if finished_episodes > 0:
+
+                avg_episode_time = (
+                    elapsed_time / finished_episodes
+                )
+
+                remaining_episodes = (
+                    EPISODES - finished_episodes
+                )
+
+                estimated_remaining_time = (
+                    avg_episode_time * remaining_episodes
+                )
+
+                remaining_hours = int(
+                    estimated_remaining_time // 3600
+                )
+
+                remaining_minutes = int(
+                    (estimated_remaining_time % 3600) // 60
+                )
+
+                remaining_seconds = int(
+                    estimated_remaining_time % 60
+                )
+            if finished_episodes % 5000 == 0:
+                save_path = (
+                    "./TESLA_Quoridor_AI/"
+                    f"dqn_episode_{finished_episodes}.weights.h5"
+                )
+
+                agent.model.model.save_weights(save_path)
+
+                print(
+                    f"모델 저장 완료: {save_path}",
+                    flush=True
+                )
+
+            winner = env.winner
 
             print(
                 f"Episode: {finished_episodes} | "
-                f"200 step 초과 강제 종료 | "
-                f"Reward: {episode_rewards[env_index]:.2f}",
+                f"Winner: P{winner} | "
+                f"Total Reward: "
+                f"{episode_rewards[env_index]:.2f} | "
+                f"P1 Reward: "
+                f"{episode_p1_rewards[env_index]:.2f} | "
+                f"P2 Reward: "
+                f"{episode_p2_rewards[env_index]:.2f} | "
+                f"Steps: "
+                f"{episode_steps[env_index]} | "
+                f"Avg Reward/Step: "
+                f"{episode_rewards[env_index] / max(1, episode_steps[env_index]):.2f} | "
+                f"Epsilon: "
+                f"{agent.epsilon:.4f}",
+                f"예상 남은 시간: "
+                f"{remaining_hours:02d}: "
+                f"{remaining_minutes:02d}: "
+                f"{remaining_seconds:02d}",
+                flush=True
+            )
+
+
+            ##################################################################
+            # 새 게임
+            ##################################################################
+
+            states[
+                env_index
+            ] = env.reset()
+
+            episode_rewards[
+                env_index
+            ] = 0
+            
+            episode_p1_rewards[
+                env_index
+            ] = 0.0
+
+            episode_p2_rewards[
+                env_index
+            ] = 0.0
+
+            episode_steps[
+                env_index
+            ] = 0
+
+
+        ##################################################################
+        # 너무 긴 게임 방지
+        ##################################################################
+
+        elif episode_steps[
+            env_index
+        ] >= 200:
+            elapsed_time = time.time() - training_start_time
+
+            if finished_episodes > 0:
+
+                avg_episode_time = (
+                    elapsed_time / finished_episodes
+                )
+
+                remaining_episodes = (
+                    EPISODES - finished_episodes
+                )
+
+                estimated_remaining_time = (
+                    avg_episode_time * remaining_episodes
+                )
+
+                remaining_hours = int(
+                    estimated_remaining_time // 3600
+                )
+
+                remaining_minutes = int(
+                    (estimated_remaining_time % 3600) // 60
+                )
+
+                remaining_seconds = int(
+                    estimated_remaining_time % 60
+                )
+            finished_episodes += 1
+            print(
+                f"Episode: {finished_episodes} | "
+                f"Winner: None | "
+                f"Total Reward: "
+                f"{episode_rewards[env_index]:.2f} | "
+                f"P1 Reward: "
+                f"{episode_p1_rewards[env_index]:.2f} | "
+                f"P2 Reward: "
+                f"{episode_p2_rewards[env_index]:.2f} | "
+                f"Steps: "
+                f"{episode_steps[env_index]} | "
+                f"Avg Reward/Step: "
+                f"{episode_rewards[env_index] / max(1, episode_steps[env_index]):.2f} | "
+                f"Epsilon: "
+                f"{agent.epsilon:.4f}",
+                f"예상 남은 시간: "
+                f"{remaining_hours:02d}: "
+                f"{remaining_minutes:02d}: "
+                f"{remaining_seconds:02d}",
                 flush=True
             )
 
@@ -1281,38 +1135,113 @@ while finished_episodes < EPISODES:
             episode_rewards[
                 env_index
             ] = 0
+            
+            episode_p1_rewards[
+                env_index
+            ] = 0.0
+
+            episode_p2_rewards[
+                env_index
+            ] = 0.0
 
             episode_steps[
                 env_index
             ] = 0
 
 
-    ######################################################################
-    # Epsilon decay
-    ######################################################################
+    ##################################################################
+    # Epsilon 감소
+    ##################################################################
 
     agent.epsilon_update()
+ 
+###################################################################################
+    
+######################################################################
+# 학습 완료
+######################################################################
 
+training_end_time = time.time()
 
-    ######################################################################
-    # 저장
-    ######################################################################
+total_training_time = training_end_time - training_start_time
 
-    if (
-        finished_episodes > 0
-        and finished_episodes % 10 == 0
-    ):
+# 평균 episode 시간
+avg_episode_time = (
+    total_training_time / finished_episodes
+)
 
-        save_path = (
-            "./TESLA_Quoridor_AI/"
-            f"dqn_episode_{finished_episodes}.weights.h5"
-        )
+# 최종 모델 저장
+final_model_path = (
+    "./TESLA_Quoridor_AI/"
+    "dqn_final.weights.h5"
+)
 
-        agent.model.model.save_weights(
-            save_path
-        )
+agent.model.model.save_weights(
+    final_model_path
+)
 
-        print(
-            f"모델 저장 완료: {save_path}",
-            flush=True
-        )
+######################################################################
+# 시간 계산
+######################################################################
+
+hours = int(total_training_time // 3600)
+minutes = int((total_training_time % 3600) // 60)
+seconds = int(total_training_time % 60)
+
+avg_hours = int(avg_episode_time // 3600)
+avg_minutes = int((avg_episode_time % 3600) // 60)
+avg_seconds = int(avg_episode_time % 60)
+
+print(
+    "\n"
+    "============================================================\n"
+    "                 TRAINING COMPLETE\n"
+    "============================================================",
+    flush=True
+)
+
+print(
+    f"총 Episode        : {finished_episodes:,} / {EPISODES:,}",
+    flush=True
+)
+
+print(
+    f"총 Training Step  : {total_training_steps:,}",
+    flush=True
+)
+
+print(
+    f"최종 Epsilon      : {agent.epsilon:.6f}",
+    flush=True
+)
+
+print(
+    f"총 학습 시간      : "
+    f"{hours:02d}시간 "
+    f"{minutes:02d}분 "
+    f"{seconds:02d}초",
+    flush=True
+)
+
+print(
+    f"평균 Episode 시간 : "
+    f"{avg_hours:02d}시간 "
+    f"{avg_minutes:02d}분 "
+    f"{avg_seconds:02d}초",
+    flush=True
+)
+
+print(
+    f"최종 모델 저장    : {final_model_path}",
+    flush=True
+)
+
+print(
+    "============================================================",
+    flush=True
+)
+
+print(
+    "학습이 정상적으로 종료되었습니다.",
+    flush=True
+)
