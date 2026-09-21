@@ -5,19 +5,20 @@
 #include <vector>
 #include <queue>
 #include <array>
+#include <tuple>
 
 #include <stdexcept> // std::out_of_range를 사용하기 위해 필수
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <omp.h>
 
-
-struct Quoridor
+struct Quoridor	
 {
 	//쿼리도 기본 시작 상태로 initialize됨
 	//쿼리도 초기 게임의 그래프를 선언 (81개의 상태 노드를 가진 그래프라고 해석시, 81*81차원의 행렬과 동치로 취급 가능)
 	std::array<std::array<std::array<bool, 4>, 9>, 9> Path; //Path[행][열][상/하/좌/우] 형식으로 배열 저장
-	std::array<uint8_t, 8> WallH = { NULL, }; //이거는 가로로 배치되는 벽의 격자점 위의 존재 여부를 저장한다.
-	std::array<uint8_t, 8> WallVt = { NULL, }; //이거는 세로로 배치되는 벽의 격자점 위의 존재 여부를 저장한다.
+	std::array<uint8_t, 8> WallH = { 0 }; //이거는 가로로 배치되는 벽의 격자점 위의 존재 여부를 저장한다.
+	std::array<uint8_t, 8> WallVt = { 0 }; //이거는 세로로 배치되는 벽의 격자점 위의 존재 여부를 저장한다.
 	/*
 	WallH는 가로로 벽을 설치하기에, 상/하 움직임을 불가능하게 한다. ( k=0,1 )
 	WallV는 세로로 벽을 설치하기에, 좌/우 움직임을 불가능하게 한다. ( k=2,3 )
@@ -118,15 +119,155 @@ bool isWall(Quoridor* Board, std::array<uint8_t, 2> GridPos) {
 	return false;
 }
 
-struct AStar_Node {
-	int Cost; //총 비용(f)
-	int HeuristicCost; //휴리스틱 비용(h)
-	int AccumulatedCost; //누적 비용(g)
 
-	std::array<uint8_t, 2> Position; //노드의 위치
-	bool operator <(const AStar_Node& other) const {
-		return this->Cost > other.Cost;
+// Move 방향
+// 0 = 위
+// 1 = 아래
+// 2 = 왼쪽
+// 3 = 오른쪽
+bool GetMoveDestination(
+	Quoridor* Board,
+	std::array<uint8_t, 2> Start,
+	uint8_t Move,
+	std::array<uint8_t, 2>& Destination,
+	bool movingP1
+)
+{
+	if (Move >= 4)
+		return false;
+
+	const std::array<uint8_t, 2>& Opponent =
+		movingP1 ? Board->P2 : Board->P1;
+
+	// 0 = 위
+	// 1 = 아래
+	// 2 = 왼쪽
+	// 3 = 오른쪽
+
+	static constexpr int dr[4] = {
+		-1, 1, 0, 0
+	};
+
+	static constexpr int dc[4] = {
+		0, 0, -1, 1
+	};
+
+	const int r = static_cast<int>(Start[0]);
+	const int c = static_cast<int>(Start[1]);
+
+	// 현재 위치에서 해당 방향으로 이동 가능한지
+	if (!Board->Path[r][c][Move])
+		return false;
+
+	const int nr = r + dr[Move];
+	const int nc = c + dc[Move];
+
+	// 보드 밖
+	if (nr < 0 || nr >= 9 ||
+		nc < 0 || nc >= 9)
+	{
+		return false;
 	}
+
+	std::array<uint8_t, 2> Next = {
+		static_cast<uint8_t>(nr),
+		static_cast<uint8_t>(nc)
+	};
+
+	// =========================================================
+	// 1. 바로 앞에 상대방이 없는 경우
+	// =========================================================
+
+	if (Next != Opponent)
+	{
+		Destination = Next;
+		return true;
+	}
+
+	// =========================================================
+	// 2. 상대방이 바로 앞에 있음
+	//    → 뒤로 점프 가능한지 확인
+	// =========================================================
+
+	const int jr = nr + dr[Move];
+	const int jc = nc + dc[Move];
+
+	if (jr >= 0 && jr < 9 &&
+		jc >= 0 && jc < 9 &&
+		Board->Path[Opponent[0]][Opponent[1]][Move])
+	{
+		Destination = {
+			static_cast<uint8_t>(jr),
+			static_cast<uint8_t>(jc)
+		};
+
+		return true;
+	}
+
+	// =========================================================
+	// 3. 뒤로 점프할 수 없음
+	//    → 상대방 옆의 대각선 칸으로 이동
+	//
+	//    위/아래 이동 중이었다면 → 왼쪽/오른쪽
+	//    왼쪽/오른쪽 이동 중이었다면 → 위/아래
+	// =========================================================
+
+	std::array<uint8_t, 2> SideMoves;
+
+	if (Move == 0 || Move == 1)
+	{
+		// 위/아래 → 왼쪽/오른쪽
+		SideMoves = { 2, 3 };
+	}
+	else
+	{
+		// 왼쪽/오른쪽 → 위/아래
+		SideMoves = { 0, 1 };
+	}
+
+	for (uint8_t SideMove : SideMoves)
+	{
+		if (!Board->Path[Opponent[0]][Opponent[1]][SideMove])
+			continue;
+
+		const int sr =
+			static_cast<int>(Opponent[0]) +
+			dr[SideMove];
+
+		const int sc =
+			static_cast<int>(Opponent[1]) +
+			dc[SideMove];
+
+		if (sr < 0 || sr >= 9 ||
+			sc < 0 || sc >= 9)
+		{
+			continue;
+		}
+
+		Destination = {
+			static_cast<uint8_t>(sr),
+			static_cast<uint8_t>(sc)
+		};
+
+		return true;
+	}
+
+	return false;
+}
+
+struct AStar_Node
+{
+	int Cost;
+	int HeuristicCost;
+	int AccumulatedCost;
+
+	std::array<uint8_t, 2> Position;
+
+	bool operator<(const AStar_Node& other) const
+	{
+		return Cost > other.Cost;
+	}
+	std::vector<std::array<uint8_t, 2>> TakePaths;
 };
 
 inline int AStar_HeuristicCost(AStar_Node* Node, int Destination) {
@@ -134,82 +275,299 @@ inline int AStar_HeuristicCost(AStar_Node* Node, int Destination) {
 	//return (Board->isP1Turn ? 0 : 8) > PlayerPos[0] ? (Board->isP1Turn ? 0 : 8) - PlayerPos[0] : PlayerPos[0] - (Board->isP1Turn ? 0 : 8);
 	return abs(Destination - Node->Position[0]);
 }
+int AStar_MakeChildNode(
+	Quoridor* Board,
+	std::priority_queue<AStar_Node>& AStar_Nodes,
+	bool Closed[9][9],
+	int Destination,
+	bool movingP1
+)
+{
+	if (AStar_Nodes.empty())
+		return -1;
 
-int AStar_MakeChildNode(Quoridor* Board, std::priority_queue<AStar_Node>* AStar_Nodes, std::vector<std::array<uint8_t, 2>>* AStar_ClosedNodes, int Destination) {
-	/*
-	자식 노드를 비용이 최소인 부모 노드를 기반으로 만들고, 부모 노드를 닫힌 리스트로 이동시키는 함수
-	자식 생성후, 그 노드가 목표가 아니면 0, 목표라면 출발-도착지까지의 거리 반환
-	*/
-	//Parent의 노드를 받고, 그 상태에서 이동 가능한 경로 탐색 후 자식 노드 생성
+	AStar_Node ParentNode = AStar_Nodes.top();
+	AStar_Nodes.pop();
 
-	//f = 비용g(n) + 휴리스틱h(n)
-	struct AStar_Node ParentNode = AStar_Nodes->top(); //부모 노드 선택
-	AStar_ClosedNodes->emplace_back(ParentNode.Position);
-	AStar_Nodes->pop();
+	const int pr = ParentNode.Position[0];
+	const int pc = ParentNode.Position[1];
 
-	struct AStar_Node ChildNode;
-	ChildNode.AccumulatedCost = ParentNode.AccumulatedCost + 1;//누적 비용은 부모 함수 + 1(1번 더 이동해야 자식이므로)
+	// 이미 처리한 노드라면 무시
+	if (Closed[pr][pc])
+		return 0;
 
-	//자식 노드 생성 & queue 에 push()
-	for (int i = 0; i < 4; i++) {
-		if (Board->Path[ParentNode.Position[0]][ParentNode.Position[1]][i]) {
-			//이동 가능한 수인지 확인
-			ChildNode.Position = ParentNode.Position; //초기에 이동 전에는 부모 노드와 같음(즉, 초기 선언)
-			ChildNode.Position[i / 2] += ((i % 2) == 0) ? -1 : 1; //상하좌우에 따라 ChildNode의 위치를 +-1(이동)
-			if (ChildNode.Position[0] == Destination) { return ChildNode.AccumulatedCost; } //자식 노드가 목표면 누적비용(거리) 반환
-			if (std::find(AStar_ClosedNodes->begin(), AStar_ClosedNodes->end(), ChildNode.Position) == AStar_ClosedNodes->end()) {
-				//AStar_ClosedNodes에 존재하지 않음(새로운 노드 >> 자식 생성)
-				ChildNode.HeuristicCost = AStar_HeuristicCost(&ChildNode, Destination); //휴리스틱 비용 계산
-				ChildNode.Cost = ChildNode.AccumulatedCost + ChildNode.HeuristicCost;
-				AStar_Nodes->emplace(ChildNode);
-			}
+	Closed[pr][pc] = true;
+
+	for (uint8_t Move = 0; Move < 4; Move++)
+	{
+		std::array<uint8_t, 2> NextPosition;
+
+		if (!GetMoveDestination(
+			Board,
+			ParentNode.Position,
+			Move,
+			NextPosition,
+			movingP1))
+		{
+			continue;
 		}
+
+		const int nr = NextPosition[0];
+		const int nc = NextPosition[1];
+
+		// 이미 Closed
+		if (Closed[nr][nc])
+			continue;
+
+		const int NewG =
+			ParentNode.AccumulatedCost + 1;
+
+		// 목적지 도착
+		if (nr == Destination)
+		{
+			return NewG;
+		}
+
+		AStar_Node ChildNode{};
+
+		ChildNode.Position = NextPosition;
+		ChildNode.AccumulatedCost = NewG;
+
+		ChildNode.HeuristicCost =
+			abs(Destination - nr);
+
+		ChildNode.Cost =
+			ChildNode.AccumulatedCost +
+			ChildNode.HeuristicCost;
+		ChildNode.TakePaths.push_back(ParentNode.Position);
+		AStar_Nodes.emplace(ChildNode);
 	}
-	//printf("AStar_Nodes Size: %d\n", (int)AStar_Nodes->size());
-	//printf("AStar_ClosedNodes Size: %d\n", (int)AStar_ClosedNodes->size());
+
 	return 0;
 }
 
-int AStar(Quoridor* Board, bool isP1Turn) {
-	/*
-	지금 차례의 플레이어가 목적지로 갈때까지의 거리 반환
-	목적지로 도달하는 것이 불가능하다면, -1 반환
-	*/
+int AStar(Quoridor* Board, bool isP1Turn)
+{
+	const int Destination =
+		isP1Turn ? 0 : 8;
 
-	std::priority_queue<AStar_Node> AStar_Nodes; //열린 리스트 선언
-	std::vector<std::array<uint8_t, 2>> AStar_ClosedNodes; //닫힌 리스트 선언(닫힌 리스트는 비용 고려를 할 필요가 없으니, 벡터 행렬로 압축
-	int Destination = isP1Turn ? 0 : 8; // 목적지 설정
-	struct AStar_Node RootNode = { 0, };
-	RootNode.Position[0] = isP1Turn ? Board->P1[0] : Board->P2[0]; // 루트 노드 위치 (플레이어의 위치)
-	RootNode.Position[1] = isP1Turn ? Board->P1[1] : Board->P2[1];
-	if (RootNode.Position[0] == Destination) { return 0; } //바로 도착
+	const std::array<uint8_t, 2>& Start =
+		isP1Turn ? Board->P1 : Board->P2;
 
-	RootNode.HeuristicCost = AStar_HeuristicCost(&RootNode, Destination); //루트 노드 휴리스틱
-	RootNode.AccumulatedCost = 0; //루트 노드라서 누적 비용 = 0
+	// 이미 목표 행
+	if (Start[0] == Destination)
+		return 0;
+
+	std::priority_queue<AStar_Node> AStar_Nodes;
+
+	bool Closed[9][9] = {};
+
+	AStar_Node RootNode{};
+
+	RootNode.Position = Start;
+
+	RootNode.AccumulatedCost = 0;
+
+	RootNode.HeuristicCost =
+		abs(Destination - static_cast<int>(Start[0]));
+
+	RootNode.Cost =
+		RootNode.AccumulatedCost +
+		RootNode.HeuristicCost;
+
 	AStar_Nodes.emplace(RootNode);
 
-	int Distance;
-	while (!AStar_Nodes.empty()) {
-		//AStar_Nodes에 원소 존재
-		Distance = AStar_MakeChildNode(Board, &AStar_Nodes, &AStar_ClosedNodes, Destination);
+	while (!AStar_Nodes.empty())
+	{
+		int Distance =
+			AStar_MakeChildNode(
+				Board,
+				AStar_Nodes,
+				Closed,
+				Destination,
+				isP1Turn
+			);
 
-		if (Distance) {
-			// 목적지 도달하는 자식노드 발견
+		if (Distance > 0)
 			return Distance;
-		}
 	}
-	return -1;//목적지로 가는 경로 존재 X
+
+	return -1;
 }
 
-bool isConnected(Quoridor Board) {
-	//보드에서 두 플레이어 모두 목적지로 가는 것이 가능한지 체크
-	if (AStar(&Board, Board.isP1Turn) != -1) {
-		//Board.isP1Turn = !Board.isP1Turn; //상대방도 연결되어있는지 체크
-		if (AStar(&Board, !Board.isP1Turn) != -1) {
-			return true;
+std::vector<std::array<uint8_t, 2>> AStar_MakeChildNode_withPath(
+	Quoridor* Board,
+	std::priority_queue<AStar_Node>& AStar_Nodes,
+	bool Closed[9][9],
+	int Destination,
+	bool movingP1
+)
+{
+	// 경로가 없다는 의미
+	if (AStar_Nodes.empty())
+		return {};
+
+	AStar_Node ParentNode = AStar_Nodes.top();
+	AStar_Nodes.pop();
+
+	const int pr = ParentNode.Position[0];
+	const int pc = ParentNode.Position[1];
+
+	// 이미 처리한 노드라면 무시
+	if (Closed[pr][pc])
+		return {};
+
+	Closed[pr][pc] = true;
+
+	for (uint8_t Move = 0; Move < 4; Move++)
+	{
+		std::array<uint8_t, 2> NextPosition;
+
+		if (!GetMoveDestination(
+			Board,
+			ParentNode.Position,
+			Move,
+			NextPosition,
+			movingP1))
+		{
+			continue;
+		}
+
+		const int nr = NextPosition[0];
+		const int nc = NextPosition[1];
+
+		// 이미 Closed
+		if (Closed[nr][nc])
+			continue;
+
+		const int NewG =
+			ParentNode.AccumulatedCost + 1;
+
+		AStar_Node ChildNode{};
+
+		ChildNode.Position = NextPosition;
+		ChildNode.AccumulatedCost = NewG;
+
+		ChildNode.HeuristicCost =
+			abs(Destination - nr);
+
+		ChildNode.Cost =
+			ChildNode.AccumulatedCost +
+			ChildNode.HeuristicCost;
+
+		// 부모가 가지고 있던 경로를 복사
+		ChildNode.TakePaths = ParentNode.TakePaths;
+
+		// 현재 이동한 위치 추가
+		ChildNode.TakePaths.push_back(NextPosition);
+
+		// 목적지 도착
+		if (nr == Destination)
+		{
+			return ChildNode.TakePaths;
+		}
+
+		AStar_Nodes.emplace(std::move(ChildNode));
+	}
+
+	return {};
+}
+
+std::vector<std::array<uint8_t, 2>> AStar_withPath(
+	Quoridor* Board,
+	bool isP1Turn
+)
+{
+	const int Destination =
+		isP1Turn ? 0 : 8;
+
+	const std::array<uint8_t, 2>& Start =
+		isP1Turn ? Board->P1 : Board->P2;
+
+	// 이미 목적지에 있다면 현재 위치만 반환
+	if (Start[0] == Destination)
+	{
+		return { Start };
+	}
+
+	std::priority_queue<AStar_Node> AStar_Nodes;
+
+	bool Closed[9][9] = {};
+
+	AStar_Node RootNode{};
+
+	RootNode.Position = Start;
+
+	RootNode.AccumulatedCost = 0;
+
+	RootNode.HeuristicCost =
+		abs(Destination - static_cast<int>(Start[0]));
+
+	RootNode.Cost =
+		RootNode.AccumulatedCost +
+		RootNode.HeuristicCost;
+
+	// 시작점을 경로에 넣음
+	RootNode.TakePaths.push_back(Start);
+
+	AStar_Nodes.emplace(std::move(RootNode));
+
+	while (!AStar_Nodes.empty())
+	{
+		std::vector<std::array<uint8_t, 2>> Path =
+			AStar_MakeChildNode_withPath(
+				Board,
+				AStar_Nodes,
+				Closed,
+				Destination,
+				isP1Turn
+			);
+
+		// 빈 벡터가 아니면 목적지까지의 경로를 찾은 것
+		if (!Path.empty())
+		{
+			return Path;
 		}
 	}
-	return false;
+
+	// 경로 없음
+	return {};
+}
+
+int AStarNextMove(
+	Quoridor* Board,
+	bool movingP1
+)
+{
+	std::vector<std::array<uint8_t, 2>> Path =
+		AStar_withPath(Board, movingP1);
+
+	if (Path.size() < 2)
+		return -1;
+
+	const auto& Current = Path[0];
+	const auto& Next = Path[1];
+
+	int dr =
+		static_cast<int>(Next[0]) -
+		static_cast<int>(Current[0]);
+
+	int dc =
+		static_cast<int>(Next[1]) -
+		static_cast<int>(Current[1]);
+
+	if (dr == -1) return 0;
+	if (dr == 1) return 1;
+	if (dc == -1) return 2;
+	if (dc == 1) return 3;
+
+	return -1;
+}
+bool isConnected(Quoridor& Board)
+{
+	return
+		AStar(&Board, true) != -1 &&
+		AStar(&Board, false) != -1;
 }
 
 //bool isLegalMove(Quoridor* Board, uint8_t Move) {
@@ -352,12 +710,20 @@ bool canPlaceWallV(Quoridor* Board, std::array<uint8_t, 2> GridPos) {
 	return true; //세로 벽 설치 가능
 }
 
-bool canMovePlayer(Quoridor* Board, uint8_t Move) {
-	std::array<uint8_t, 2>* Player = (Board->isP1Turn) ? &Board->P1 : &Board->P2;
-	if (Board->Path.at(Player->at(0)).at(Player->at(1)).at(Move)) {
-		return true;
-	}
-	return false;
+bool canMovePlayer(Quoridor* Board, uint8_t Move)
+{
+	std::array<uint8_t, 2> Player =
+		Board->isP1Turn ? Board->P1 : Board->P2;
+
+	std::array<uint8_t, 2> Destination;
+
+	return GetMoveDestination(
+		Board,
+		Player,
+		Move,
+		Destination,
+		Board->isP1Turn
+	);
 }
 
 inline void PassTurn(Quoridor* Board) {
@@ -407,41 +773,28 @@ int PlaceWallV(Quoridor* Board, std::array<uint8_t, 2> GridPos) {
 	return 1; //예외 처리
 }
 
-int MovePlayer(Quoridor* Board, uint8_t Move) {
-	//점프 명령이면, -1
-	//정상적으로 이동 후, 턴을 넘기면, 0
-	//예외면 1
-	std::array<uint8_t, 2>* Player = (Board->isP1Turn) ? &Board->P1 : &Board->P2;
-	std::array<uint8_t, 2> Opponent = (Board->isP1Turn) ? Board->P2 : Board->P1;
-	if (canMovePlayer(Board, Move)) {
-		//이동 가능(Path에서 1)
-		switch (Move) {
-		case 0:
-			Player->at(0) -= 1;
-			break;
-		case 1:
-			Player->at(0) += 1;
-			break;
-		case 2:
-			Player->at(1) -= 1;
-			break;
-		case 3:
-			Player->at(1) += 1;
-			break;
-		}
-		if (*Player == Opponent) {
-			//상대랑 위치 겹침(점프) => 턴 넘김 X
-			return -1;
-		}
-		else {
-			//성공적으로 플레이어 이동 => 턴 넘김
-			PassTurn(Board);
-			//printf("turn passed\n");
+int MovePlayer(Quoridor* Board, uint8_t Move)
+{
+	std::array<uint8_t, 2>* Player =
+		Board->isP1Turn ? &Board->P1 : &Board->P2;
 
-			return 0;
-		}
+	std::array<uint8_t, 2> Destination;
+
+	if (!GetMoveDestination(
+		Board,
+		*Player,
+		Move,
+		Destination,
+		Board->isP1Turn))
+	{
+		return 1;
 	}
-	return 1; //예외처리
+
+	*Player = Destination;
+
+	PassTurn(Board);
+
+	return 0;
 }
 
 int isGameOver(Quoridor* Board) {
@@ -455,6 +808,337 @@ int isGameOver(Quoridor* Board) {
 	else {
 		return 0;
 	}
+}
+std::tuple<
+	std::vector<float>,
+	std::vector<int>,
+	std::vector<int>,
+	std::vector<int>
+>
+StepBatchImpl(
+	pybind11::list boards,
+	const std::vector<int>& actions,
+	const std::vector<int>& actingPlayers,
+	const std::vector<int>& prevP1Distances,
+	const std::vector<int>& prevP2Distances
+)
+{
+	const size_t N = boards.size();
+
+	if (actions.size() != N ||
+		actingPlayers.size() != N ||
+		prevP1Distances.size() != N ||
+		prevP2Distances.size() != N)
+	{
+		throw std::runtime_error(
+			"StepBatch: input sizes do not match"
+		);
+	}
+
+	// ============================================================
+	// Python Quoridor 객체의 실제 주소
+	// ============================================================
+
+	std::vector<Quoridor*> boardPtrs(N);
+
+	for (size_t i = 0; i < N; ++i)
+	{
+		boardPtrs[i] =
+			&pybind11::cast<Quoridor&>(boards[i]);
+	}
+
+	// ============================================================
+	// 결과 배열
+	// ============================================================
+
+	std::vector<float> rewards(N, 0.0f);
+	std::vector<int> dones(N, 0);
+
+	std::vector<int> p1Distances(N, -1);
+	std::vector<int> p2Distances(N, -1);
+
+	// ============================================================
+	// GIL release
+	// ============================================================
+
+	{
+		pybind11::gil_scoped_release release;
+
+#pragma omp parallel for
+		for (int i = 0; i < static_cast<int>(N); ++i)
+		{
+			Quoridor* board = boardPtrs[i];
+
+			const int action = actions[i];
+			const int actingPlayer = actingPlayers[i];
+
+			float reward = 0.0f;
+
+			// ====================================================
+			// 1. 잘못된 actingPlayer 방어
+			// ====================================================
+
+			if (actingPlayer != 1 && actingPlayer != 2)
+			{
+				rewards[i] = -2.0f;
+
+				p1Distances[i] = AStar(board, true);
+				p2Distances[i] = AStar(board, false);
+
+				dones[i] = 0;
+
+				continue;
+			}
+
+			// ====================================================
+			// 2. 행동 실행
+			// ====================================================
+
+			int result = 1;
+
+			if (action < 0 || action >= 132)
+			{
+				// 존재하지 않는 행동
+				reward = -2.0f;
+
+				p1Distances[i] = AStar(board, true);
+				p2Distances[i] = AStar(board, false);
+
+				rewards[i] = reward;
+				dones[i] = 0;
+
+				continue;
+			}
+
+			// ----------------------------------------------------
+			// 플레이어 이동
+			// ----------------------------------------------------
+
+			if (action < 4)
+			{
+				result = MovePlayer(
+					board,
+					static_cast<uint8_t>(action)
+				);
+			}
+
+			// ----------------------------------------------------
+			// 가로 벽
+			// ----------------------------------------------------
+
+			else if (action < 68)
+			{
+				const int wallIndex = action - 4;
+
+				std::array<uint8_t, 2> gridPos =
+				{
+					static_cast<uint8_t>(wallIndex / 8),
+					static_cast<uint8_t>(wallIndex % 8)
+				};
+
+				result = PlaceWallH(
+					board,
+					gridPos
+				);
+			}
+
+			// ----------------------------------------------------
+			// 세로 벽
+			// ----------------------------------------------------
+
+			else
+			{
+				const int wallIndex = action - 68;
+
+				std::array<uint8_t, 2> gridPos =
+				{
+					static_cast<uint8_t>(wallIndex / 8),
+					static_cast<uint8_t>(wallIndex % 8)
+				};
+
+				result = PlaceWallV(
+					board,
+					gridPos
+				);
+			}
+
+			// ====================================================
+			// 3. 불법 행동
+			// ====================================================
+
+			if (result != 0)
+			{
+				reward = -2.0f;
+
+				p1Distances[i] = AStar(
+					board,
+					true
+				);
+
+				p2Distances[i] = AStar(
+					board,
+					false
+				);
+
+				rewards[i] = reward;
+				dones[i] = 0;
+
+				continue;
+			}
+
+			// ====================================================
+			// 4. 행동 후 최단거리 계산
+			// ====================================================
+
+			p1Distances[i] = AStar(
+				board,
+				true
+			);
+
+			p2Distances[i] = AStar(
+				board,
+				false
+			);
+
+			// ====================================================
+			// 5. 현재 플레이어 / 상대방 거리 선택
+			// ====================================================
+
+			const int currentMyDistance =
+				(actingPlayer == 1)
+				? p1Distances[i]
+				: p2Distances[i];
+
+			const int currentOpponentDistance =
+				(actingPlayer == 1)
+				? p2Distances[i]
+				: p1Distances[i];
+
+			const int previousMyDistance =
+				(actingPlayer == 1)
+				? prevP1Distances[i]
+				: prevP2Distances[i];
+
+			const int previousOpponentDistance =
+				(actingPlayer == 1)
+				? prevP2Distances[i]
+				: prevP1Distances[i];
+
+			// ====================================================
+			// 내 거리 감소     -> +
+			// 내 거리 증가     -> -
+			//
+			// 상대 거리 증가   -> +
+			// 상대 거리 감소   -> -
+			// ====================================================
+
+			// =========================================================
+			// 거리 기반 보상
+			// =========================================================
+
+			float myProgress = 0.0f;
+			float opponentProgress = 0.0f;
+
+			if (previousMyDistance >= 0 &&
+				currentMyDistance >= 0)
+			{
+				// 내 최단경로가 짧아지면 +보상
+				myProgress =
+					static_cast<float>(
+						previousMyDistance - currentMyDistance
+						);
+			}
+
+			if (previousOpponentDistance >= 0 &&
+				currentOpponentDistance >= 0)
+			{
+				// 상대 최단경로가 길어지면 +보상
+				opponentProgress =
+					static_cast<float>(
+						currentOpponentDistance -
+						previousOpponentDistance
+						);
+			}
+
+			// 너무 큰 거리 변화가 보상을 폭발시키지 않도록 제한
+			myProgress =
+				std::clamp(myProgress, -5.0f, 5.0f);
+
+			opponentProgress =
+				std::clamp(opponentProgress, -5.0f, 5.0f);
+
+			// 내 진행을 더 중요하게
+			reward += 1.0f * myProgress;
+
+			// 상대방 방해
+			reward += 0.5f * opponentProgress;
+
+			// 벽 설치에는 작은 비용
+			if (action >= 4)
+			{
+				reward -= 0.2f;
+			}
+
+			// ====================================================
+			// 9. 게임 종료 판정
+			// ====================================================
+
+			const int winner = isGameOver(board);
+
+			if (winner != 0)
+			{
+				// ------------------------------------------------
+				// 승리
+				// ------------------------------------------------
+
+				if (winner == actingPlayer)
+				{
+					reward += 150.0f;
+				}
+
+				// ------------------------------------------------
+				// 상대방 승리
+				//
+				// 일반적으로 이 경우는 상대가 이전 행동에서
+				// 이미 게임을 끝냈어야 하므로 자주 발생하지 않음.
+				// 그래도 안전하게 처리.
+				// ------------------------------------------------
+
+				else
+				{
+					reward -= 150.0f;
+				}
+
+				dones[i] = 1;
+			}
+
+			// ====================================================
+			// 10. 게임 진행 중
+			// ====================================================
+
+			else
+			{
+				dones[i] = 0;
+			}
+
+			// ====================================================
+			// 11. 최종 reward 저장
+			// ====================================================
+
+			rewards[i] = reward;
+		}
+	}
+
+	// ============================================================
+	// 결과 반환
+	// ============================================================
+
+	return std::make_tuple(
+		rewards,
+		dones,
+		p1Distances,
+		p2Distances
+	);
 }
 
 std::vector<int> GetValidActions(Quoridor* Board) {
@@ -622,6 +1306,8 @@ int main() {
 
 //pybind11 모듈 바인딩
 PYBIND11_MODULE(Quoridor, m) {
+	omp_set_dynamic(0);
+	omp_set_num_threads(16);
 	m.doc() = "Quoridor Cpp library";
 	pybind11::class_<Quoridor>(m, "Quoridor")
 		.def(pybind11::init<>())// 생성자 바인딩 (필요 시)
@@ -634,7 +1320,7 @@ PYBIND11_MODULE(Quoridor, m) {
 		.def_readwrite("isP1Turn", &Quoridor::isP1Turn);
 
 	m.def("isWall", &isWall, "checks if the following GridPos has a wall");
-	m.def("isConected", &isConnected, "checks if the players are possible to reach destination");
+	m.def("isConnected", &isConnected, "checks if the players are possible to reach destination");
 	m.def("canPlaceWallH", &canPlaceWallH, "checks if placing a horizontal wall is valid");
 	m.def("canPlaceWallV", &canPlaceWallV, "checks if placing a vertical wall is valid");
 	m.def("canMovePlayer", &canMovePlayer, "checks if moving a player");
@@ -643,6 +1329,26 @@ PYBIND11_MODULE(Quoridor, m) {
 	m.def("PrintBoard", &Quoridor::PrintBoard, "prints current Board");
 	m.def("MovePlayer", &MovePlayer, "moves player");
 	m.def("AStar", &AStar, "finds the distance between Player and destination");
+	m.def("AStar_withPath", &AStar_withPath, "finds the nodes between Player and destination");
 	m.def("isGameOver", &isGameOver, "checks if the game is over and returns the winner");
 	m.def("GetValidActions", &GetValidActions, "gets a vector of valid actions");
+	m.def("AStarNextMove", &AStarNextMove);
+	m.def(
+		"StepBatch",
+		[](pybind11::list boards,
+			const std::vector<int>& actions,
+			const std::vector<int>& actingPlayers,
+			const std::vector<int>& prevP1Distances,
+			const std::vector<int>& prevP2Distances)
+		{
+			return StepBatchImpl(
+				boards,
+				actions,
+				actingPlayers,
+				prevP1Distances,
+				prevP2Distances
+			);
+		},
+		"Execute multiple Quoridor environments in parallel"
+	);
 }
