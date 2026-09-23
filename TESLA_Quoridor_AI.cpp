@@ -31,12 +31,19 @@ struct Quoridor
 	//**이 이유때문에, (WallV[행] & (1 << 열{왼쪽부터 0 ~ 7}))이런 식으로 판정해야 함 ㅎㅎ**
 	Quoridor() {
 		//Quoridor 초기 보드 상태 설정
-		std::fill(&Path[0][0][0], &Path[8][8][3], 1);
+		// 모든 이동 경로를 우선 true로 초기화
+		std::fill(
+			&Path[0][0][0],
+			&Path[0][0][0] + 9 * 9 * 4,
+			true
+		);
+
+		// 보드 경계
 		for (int i = 0; i < 9; i++) {
-			Path.at(0).at(i).at(0) = false; //맨 위쪽 줄에서 위쪽으로 갈수 없게
-			Path.at(8).at(i).at(1) = false; //맨 아래쪽 줄에서 아래쪽으로 갈수 없게
-			Path.at(i).at(0).at(2) = false; //맨 왼쪽 줄에서 왼쪽으로 갈수 없게
-			Path.at(i).at(8).at(3) = false; //맨 오른쪽 줄에서 오른쪽으로 갈수 없게
+			Path[0][i][0] = false; // 위
+			Path[8][i][1] = false; // 아래
+			Path[i][0][2] = false; // 왼쪽
+			Path[i][8][3] = false; // 오른쪽
 		}
 	}
 	std::array<uint8_t, 2> P1 = { 8,4 }; //P1의 보드 위의 행/열
@@ -119,6 +126,7 @@ bool isWall(Quoridor* Board, std::array<uint8_t, 2> GridPos) {
 	return false;
 }
 
+/*
 
 // Move 방향
 // 0 = 위
@@ -136,13 +144,14 @@ bool GetMoveDestination(
 	if (Move >= 4)
 		return false;
 
-	const std::array<uint8_t, 2>& Opponent =
-		movingP1 ? Board->P2 : Board->P1;
-
-	// 0 = 위
-	// 1 = 아래
-	// 2 = 왼쪽
-	// 3 = 오른쪽
+	// ============================================================
+	// 방향
+	//
+	// 0 = UP
+	// 1 = DOWN
+	// 2 = LEFT
+	// 3 = RIGHT
+	// ============================================================
 
 	static constexpr int dr[4] = {
 		-1, 1, 0, 0
@@ -155,7 +164,10 @@ bool GetMoveDestination(
 	const int r = static_cast<int>(Start[0]);
 	const int c = static_cast<int>(Start[1]);
 
-	// 현재 위치에서 해당 방향으로 이동 가능한지
+	// ============================================================
+	// 1. 현재 위치에서 해당 방향으로 이동할 수 있는지
+	// ============================================================
+
 	if (!Board->Path[r][c][Move])
 		return false;
 
@@ -169,14 +181,23 @@ bool GetMoveDestination(
 		return false;
 	}
 
-	std::array<uint8_t, 2> Next = {
+	const std::array<uint8_t, 2> Next = {
 		static_cast<uint8_t>(nr),
 		static_cast<uint8_t>(nc)
 	};
 
-	// =========================================================
-	// 1. 바로 앞에 상대방이 없는 경우
-	// =========================================================
+	// ============================================================
+	// 상대방 위치
+	// ============================================================
+
+	const std::array<uint8_t, 2>& Opponent =
+		movingP1 ? Board->P2 : Board->P1;
+
+	// ============================================================
+	// 2. 상대방이 없는 경우
+	//
+	// 그냥 한 칸 이동
+	// ============================================================
 
 	if (Next != Opponent)
 	{
@@ -184,49 +205,78 @@ bool GetMoveDestination(
 		return true;
 	}
 
-	// =========================================================
-	// 2. 상대방이 바로 앞에 있음
-	//    → 뒤로 점프 가능한지 확인
-	// =========================================================
+	// ============================================================
+	// 여기부터:
+	//
+	// Start
+	//   ↓
+	// Opponent
+	//
+	// 상황
+	// ============================================================
 
-	const int jr = nr + dr[Move];
-	const int jc = nc + dc[Move];
+	// ============================================================
+	// 3. 상대방 바로 뒤로 점프
+	//
+	// 상대방의 같은 방향으로 이동 가능한지 확인
+	// ============================================================
 
-	if (jr >= 0 && jr < 9 &&
-		jc >= 0 && jc < 9 &&
-		Board->Path[Opponent[0]][Opponent[1]][Move])
+	if (Board->Path[Opponent[0]][Opponent[1]][Move])
 	{
-		Destination = {
-			static_cast<uint8_t>(jr),
-			static_cast<uint8_t>(jc)
-		};
+		const int jr =
+			static_cast<int>(Opponent[0]) + dr[Move];
 
-		return true;
+		const int jc =
+			static_cast<int>(Opponent[1]) + dc[Move];
+
+		// 상대방 뒤가 보드 안쪽이면 점프 가능
+		if (jr >= 0 && jr < 9 &&
+			jc >= 0 && jc < 9)
+		{
+			Destination = {
+				static_cast<uint8_t>(jr),
+				static_cast<uint8_t>(jc)
+			};
+
+			return true;
+		}
+
+		// 뒤쪽이 보드 밖이면 점프 불가능
 	}
 
-	// =========================================================
-	// 3. 뒤로 점프할 수 없음
-	//    → 상대방 옆의 대각선 칸으로 이동
+	// ============================================================
+	// 4. 상대방 뒤가 막혀 있는 경우
 	//
-	//    위/아래 이동 중이었다면 → 왼쪽/오른쪽
-	//    왼쪽/오른쪽 이동 중이었다면 → 위/아래
-	// =========================================================
+	// 상대방의 양 옆으로 이동
+	//
+	// UP / DOWN 중이었다면 LEFT / RIGHT
+	// LEFT / RIGHT 중이었다면 UP / DOWN
+	// ============================================================
 
-	std::array<uint8_t, 2> SideMoves;
+	uint8_t SideMoves[2];
 
 	if (Move == 0 || Move == 1)
 	{
-		// 위/아래 → 왼쪽/오른쪽
-		SideMoves = { 2, 3 };
+		// 위/아래로 상대에게 접근
+		SideMoves[0] = 2; // LEFT
+		SideMoves[1] = 3; // RIGHT
 	}
 	else
 	{
-		// 왼쪽/오른쪽 → 위/아래
-		SideMoves = { 0, 1 };
+		// 왼쪽/오른쪽으로 상대에게 접근
+		SideMoves[0] = 0; // UP
+		SideMoves[1] = 1; // DOWN
 	}
 
-	for (uint8_t SideMove : SideMoves)
+	// ============================================================
+	// 두 방향 모두 검사
+	// ============================================================
+
+	for (int i = 0; i < 2; ++i)
 	{
+		const uint8_t SideMove = SideMoves[i];
+
+		// 상대방 위치에서 해당 방향으로 이동할 수 있어야 함
 		if (!Board->Path[Opponent[0]][Opponent[1]][SideMove])
 			continue;
 
@@ -238,11 +288,141 @@ bool GetMoveDestination(
 			static_cast<int>(Opponent[1]) +
 			dc[SideMove];
 
+		// 보드 밖
 		if (sr < 0 || sr >= 9 ||
 			sc < 0 || sc >= 9)
 		{
 			continue;
 		}
+
+		Destination = {
+			static_cast<uint8_t>(sr),
+			static_cast<uint8_t>(sc)
+		};
+
+		return true;
+	}
+
+	// ============================================================
+	// 5. 이동 불가능
+	// ============================================================
+
+	return false;
+}
+*/
+
+bool GetMoveDestination(
+	Quoridor* Board,
+	std::array<uint8_t, 2> Start,
+	uint8_t Move,
+	std::array<uint8_t, 2>& Destination,
+	bool movingP1
+)
+{
+	if (Move >= 4)
+		return false;
+
+	static constexpr int dr[4] = { -1, 1, 0, 0 };
+	static constexpr int dc[4] = { 0, 0, -1, 1 };
+
+	const int r = static_cast<int>(Start[0]);
+	const int c = static_cast<int>(Start[1]);
+
+	// 현재 칸에서 해당 방향으로 이동 가능한지
+	if (!Board->Path[r][c][Move])
+		return false;
+
+	const int nr = r + dr[Move];
+	const int nc = c + dc[Move];
+
+	if (nr < 0 || nr >= 9 || nc < 0 || nc >= 9)
+		return false;
+
+	const std::array<uint8_t, 2> Next = {
+		static_cast<uint8_t>(nr),
+		static_cast<uint8_t>(nc)
+	};
+
+	const std::array<uint8_t, 2>& Opponent =
+		movingP1 ? Board->P2 : Board->P1;
+
+
+	// =========================================================
+	// 1. 일반 이동
+	// =========================================================
+
+	if (Next != Opponent)
+	{
+		Destination = Next;
+		return true;
+	}
+
+
+	// =========================================================
+	// 2. 상대방이 바로 앞에 있음
+	//    -> 상대방을 뛰어넘을 수 있는지 확인
+	// =========================================================
+
+	const int jr = static_cast<int>(Opponent[0]) + dr[Move];
+	const int jc = static_cast<int>(Opponent[1]) + dc[Move];
+
+	// 상대방 뒤쪽이 보드 밖이면 직선 점프 불가능
+	if (jr >= 0 && jr < 9 &&
+		jc >= 0 && jc < 9)
+	{
+		// 상대방 -> 뒤쪽 칸으로 이동 가능
+		if (Board->Path[Opponent[0]][Opponent[1]][Move])
+		{
+			Destination = {
+				static_cast<uint8_t>(jr),
+				static_cast<uint8_t>(jc)
+			};
+
+			return true;
+		}
+	}
+
+
+	// =========================================================
+	// 3. 직선 점프가 막혀 있음
+	//    -> 대각선 우회
+	// =========================================================
+
+	uint8_t SideMoves[2];
+
+	if (Move == 0 || Move == 1)
+	{
+		// 위/아래로 접근했으면
+		// 왼쪽/오른쪽으로 우회
+		SideMoves[0] = 2;
+		SideMoves[1] = 3;
+	}
+	else
+	{
+		// 왼쪽/오른쪽으로 접근했으면
+		// 위/아래로 우회
+		SideMoves[0] = 0;
+		SideMoves[1] = 1;
+	}
+
+
+	for (int i = 0; i < 2; ++i)
+	{
+		const uint8_t SideMove = SideMoves[i];
+
+		// 상대방 위치에서 옆으로 갈 수 있는가?
+		if (!Board->Path[Opponent[0]][Opponent[1]][SideMove])
+			continue;
+
+		const int sr =
+			static_cast<int>(Opponent[0]) + dr[SideMove];
+
+		const int sc =
+			static_cast<int>(Opponent[1]) + dc[SideMove];
+
+		if (sr < 0 || sr >= 9 ||
+			sc < 0 || sc >= 9)
+			continue;
 
 		Destination = {
 			static_cast<uint8_t>(sr),
@@ -542,8 +722,28 @@ int AStarNextMove(
 	std::vector<std::array<uint8_t, 2>> Path =
 		AStar_withPath(Board, movingP1);
 
-	if (Path.size() < 2)
+	if (Path.empty())
+	{
+		std::cout
+			<< "\n========== AStarNextMove FAILED ==========\n";
+
+		std::cout
+			<< "Player: "
+			<< (movingP1 ? 1 : 2)
+			<< "\n";
+
+		Board->PrintBoard();
+
+		std::cout
+			<< "===========================================\n";
+
 		return -1;
+	}
+
+	if (Path.size() < 2)
+	{
+		return -1;
+	}
 
 	const auto& Current = Path[0];
 	const auto& Next = Path[1];
@@ -556,13 +756,42 @@ int AStarNextMove(
 		static_cast<int>(Next[1]) -
 		static_cast<int>(Current[1]);
 
-	if (dr == -1) return 0;
-	if (dr == 1) return 1;
-	if (dc == -1) return 2;
-	if (dc == 1) return 3;
+	/*
+		일반적인 1칸 이동
+	*/
+
+	if (dr == -1 && dc == 0)
+		return 0;   // UP
+
+	if (dr == 1 && dc == 0)
+		return 1;   // DOWN
+
+	if (dr == 0 && dc == -1)
+		return 2;   // LEFT
+
+	if (dr == 0 && dc == 1)
+		return 3;   // RIGHT
+
+
+	/*
+		2칸 점프
+	*/
+
+	if (dr < 0 && dc == 0)
+		return 0;
+
+	if (dr > 0 && dc == 0)
+		return 1;
+
+	if (dr == 0 && dc < 0)
+		return 2;
+
+	if (dr == 0 && dc > 0)
+		return 3;
 
 	return -1;
 }
+
 bool isConnected(Quoridor& Board)
 {
 	return
@@ -809,6 +1038,60 @@ int isGameOver(Quoridor* Board) {
 		return 0;
 	}
 }
+
+// action:
+// 0 = UP
+// 1 = DOWN
+// 2 = LEFT
+// 3 = RIGHT
+//
+// AStar_withPath가 반환하는 path는
+// {현재 위치, 다음 위치, 다음 위치, ...} 형태라고 가정
+int GetAStarDirectionReward(
+	Quoridor* Board,
+	bool movingP1,
+	int action
+)
+{
+	// 이동 행동이 아니면 보상 없음
+	if (action < 0 || action >= 4)
+		return 0;
+
+	// 현재 A* 최단 경로
+	std::vector<std::array<uint8_t, 2>> Path =
+		AStar_withPath(Board, movingP1);
+
+	if (Path.size() < 2)
+		return 0;
+
+	const auto& AStarNext = Path[1];
+
+	// 현재 플레이어 위치
+	const std::array<uint8_t, 2> Current =
+		movingP1 ? Board->P1 : Board->P2;
+
+	// 이 action을 실제로 했을 때 도착하는 위치
+	std::array<uint8_t, 2> ActionDestination;
+
+	if (!GetMoveDestination(
+		Board,
+		Current,
+		static_cast<uint8_t>(action),
+		ActionDestination,
+		movingP1))
+	{
+		return 0;
+	}
+
+	// A*가 선택한 다음 위치와
+	// DQN action의 실제 도착 위치가 같으면
+	// A* 방향을 따른 것
+	if (ActionDestination == AStarNext)
+		return 1;
+
+	return 0;
+}
+
 std::tuple<
 	std::vector<float>,
 	std::vector<int>,
@@ -875,7 +1158,7 @@ StepBatchImpl(
 			float reward = 0.0f;
 
 			// ====================================================
-			// 1. 잘못된 actingPlayer 방어
+			// 1. actingPlayer 검증
 			// ====================================================
 
 			if (actingPlayer != 1 && actingPlayer != 2)
@@ -891,14 +1174,36 @@ StepBatchImpl(
 			}
 
 			// ====================================================
-			// 2. 행동 실행
+			// 2. 행동 플레이어 결정
+			// ====================================================
+			//
+			// actingPlayer == 1 -> P1
+			// actingPlayer == 2 -> P2
+			//
+			// 이후 이 Step에서는 actingPlayer를 기준으로
+			// 모든 행동과 보상을 처리한다.
 			// ====================================================
 
-			int result = 1;
+			const bool movingP1 = (actingPlayer == 1);
+
+			// ----------------------------------------------------
+			// 실제 Board의 턴도 actingPlayer와 동기화
+			// ----------------------------------------------------
+			//
+			// MovePlayer / PlaceWallH / PlaceWallV는
+			// 내부적으로 board->isP1Turn을 사용한다.
+			//
+			// 따라서 actingPlayer와 반드시 일치시킨다.
+			// ----------------------------------------------------
+
+			board->isP1Turn = movingP1;
+
+			// ====================================================
+			// 3. 행동 범위 검사
+			// ====================================================
 
 			if (action < 0 || action >= 132)
 			{
-				// 존재하지 않는 행동
 				reward = -2.0f;
 
 				p1Distances[i] = AStar(board, true);
@@ -909,6 +1214,33 @@ StepBatchImpl(
 
 				continue;
 			}
+
+			// ====================================================
+			// 4. 행동 전 A* 방향 계산
+			// ====================================================
+			//
+			// 반드시 행동 실행 전에 계산해야 한다.
+			//
+			// action 0~3만 A* 방향 보상을 받을 수 있다.
+			// ====================================================
+
+			int astarDirectionReward = 0;
+
+			if (action >= 0 && action < 4)
+			{
+				astarDirectionReward =
+					GetAStarDirectionReward(
+						board,
+						movingP1,
+						action
+					);
+			}
+
+			// ====================================================
+			// 5. 행동 실행
+			// ====================================================
+
+			int result = 1;
 
 			// ----------------------------------------------------
 			// 플레이어 이동
@@ -924,6 +1256,7 @@ StepBatchImpl(
 
 			// ----------------------------------------------------
 			// 가로 벽
+			// action 4 ~ 67
 			// ----------------------------------------------------
 
 			else if (action < 68)
@@ -944,6 +1277,7 @@ StepBatchImpl(
 
 			// ----------------------------------------------------
 			// 세로 벽
+			// action 68 ~ 131
 			// ----------------------------------------------------
 
 			else
@@ -963,22 +1297,23 @@ StepBatchImpl(
 			}
 
 			// ====================================================
-			// 3. 불법 행동
+			// 6. 불법 행동
+			// ====================================================
+			//
+			// 불법 행동은 -2만 준다.
+			//
+			// 벽 설치 비용은 여기에는 적용하지 않는다.
 			// ====================================================
 
 			if (result != 0)
 			{
 				reward = -2.0f;
 
-				p1Distances[i] = AStar(
-					board,
-					true
-				);
+				p1Distances[i] =
+					AStar(board, true);
 
-				p2Distances[i] = AStar(
-					board,
-					false
-				);
+				p2Distances[i] =
+					AStar(board, false);
 
 				rewards[i] = reward;
 				dones[i] = 0;
@@ -987,72 +1322,79 @@ StepBatchImpl(
 			}
 
 			// ====================================================
-			// 4. 행동 후 최단거리 계산
+			// 7. 행동 후 최단거리 계산
 			// ====================================================
 
-			p1Distances[i] = AStar(
-				board,
-				true
-			);
+			p1Distances[i] =
+				AStar(board, true);
 
-			p2Distances[i] = AStar(
-				board,
-				false
-			);
+			p2Distances[i] =
+				AStar(board, false);
 
 			// ====================================================
-			// 5. 현재 플레이어 / 상대방 거리 선택
+			// 8. 현재 플레이어 / 상대방 거리
 			// ====================================================
 
 			const int currentMyDistance =
-				(actingPlayer == 1)
+				movingP1
 				? p1Distances[i]
 				: p2Distances[i];
 
 			const int currentOpponentDistance =
-				(actingPlayer == 1)
+				movingP1
 				? p2Distances[i]
 				: p1Distances[i];
 
 			const int previousMyDistance =
-				(actingPlayer == 1)
+				movingP1
 				? prevP1Distances[i]
 				: prevP2Distances[i];
 
 			const int previousOpponentDistance =
-				(actingPlayer == 1)
+				movingP1
 				? prevP2Distances[i]
 				: prevP1Distances[i];
 
 			// ====================================================
-			// 내 거리 감소     -> +
-			// 내 거리 증가     -> -
-			//
-			// 상대 거리 증가   -> +
-			// 상대 거리 감소   -> -
+			// 9. 거리 변화 계산
 			// ====================================================
-
-			// =========================================================
-			// 거리 기반 보상
-			// =========================================================
 
 			float myProgress = 0.0f;
 			float opponentProgress = 0.0f;
 
+			// ----------------------------------------------------
+			// 내 최단거리 변화
+			//
+			// 이전 7 -> 현재 6
+			// => +1
+			//
+			// 이전 7 -> 현재 8
+			// => -1
+			// ----------------------------------------------------
+
 			if (previousMyDistance >= 0 &&
 				currentMyDistance >= 0)
 			{
-				// 내 최단경로가 짧아지면 +보상
 				myProgress =
 					static_cast<float>(
-						previousMyDistance - currentMyDistance
+						previousMyDistance -
+						currentMyDistance
 						);
 			}
+
+			// ----------------------------------------------------
+			// 상대 최단거리 변화
+			//
+			// 이전 7 -> 현재 8
+			// => +1
+			//
+			// 이전 7 -> 현재 6
+			// => -1
+			// ----------------------------------------------------
 
 			if (previousOpponentDistance >= 0 &&
 				currentOpponentDistance >= 0)
 			{
-				// 상대 최단경로가 길어지면 +보상
 				opponentProgress =
 					static_cast<float>(
 						currentOpponentDistance -
@@ -1060,69 +1402,112 @@ StepBatchImpl(
 						);
 			}
 
-			// 너무 큰 거리 변화가 보상을 폭발시키지 않도록 제한
+			// ----------------------------------------------------
+			// 지나치게 큰 거리 변화 제한
+			// ----------------------------------------------------
+
 			myProgress =
-				std::clamp(myProgress, -5.0f, 5.0f);
+				std::clamp(
+					myProgress,
+					-2.0f,
+					2.0f
+				);
 
 			opponentProgress =
-				std::clamp(opponentProgress, -5.0f, 5.0f);
+				std::clamp(
+					opponentProgress,
+					-2.0f,
+					2.0f
+				);
 
-			// 내 진행을 더 중요하게
-			reward += 1.0f * myProgress;
+			// ====================================================
+			// 10. 내 최단경로 보상
+			// ====================================================
 
-			// 상대방 방해
-			reward += 0.5f * opponentProgress;
+			reward +=
+				0.5f * myProgress;
 
-			// 벽 설치에는 작은 비용
-			if (action >= 4)
+			// ====================================================
+			// 11. 상대 최단경로 보상
+			// ====================================================
+
+			reward +=
+				0.5f * opponentProgress;
+
+			// ====================================================
+			// 12. 현재 상태의 거리 차이 보상
+			// ====================================================
+			//
+			// 상대 거리 > 내 거리
+			// => +
+			//
+			// 상대 거리 < 내 거리
+			// => -
+			// ====================================================
+
+			if (currentMyDistance >= 0 &&
+				currentOpponentDistance >= 0)
 			{
-				reward -= 0.2f;
+				float distanceDifference =
+					static_cast<float>(
+						currentOpponentDistance -
+						currentMyDistance
+						);
+
+				distanceDifference =
+					std::clamp(
+						distanceDifference,
+						-10.0f,
+						10.0f
+					);
+
+				reward +=
+					0.15f * distanceDifference;
 			}
 
 			// ====================================================
-			// 9. 게임 종료 판정
+			// 13. 벽 설치 기본 비용
+			// ====================================================
+			//
+			// action:
+			// 0 ~ 3   = 이동
+			// 4 ~ 131 = 벽
+			//
+			// 벽을 설치하는 것 자체에는 작은 비용을 준다.
+			//
+			// 단,
+			// 좋은 벽을 설치해서 상대 최단경로를 증가시키면
+			// 위의 opponentProgress 보상은 그대로 받는다.
 			// ====================================================
 
-			const int winner = isGameOver(board);
+			constexpr float WALL_PLACEMENT_COST = 0.1f;
+
+			if (action >= 4)
+			{
+				reward -= WALL_PLACEMENT_COST;
+			}
+			else {
+				reward -= 0.08f;
+			}
+
+			// ====================================================
+			// 15. 게임 종료 확인
+			// ====================================================
+
+			const int winner =
+				isGameOver(board);
 
 			if (winner != 0)
 			{
-				// ------------------------------------------------
-				// 승리
-				// ------------------------------------------------
-
-				if (winner == actingPlayer)
-				{
-					reward += 150.0f;
-				}
-
-				// ------------------------------------------------
-				// 상대방 승리
-				//
-				// 일반적으로 이 경우는 상대가 이전 행동에서
-				// 이미 게임을 끝냈어야 하므로 자주 발생하지 않음.
-				// 그래도 안전하게 처리.
-				// ------------------------------------------------
-
-				else
-				{
-					reward -= 150.0f;
-				}
-
 				dones[i] = 1;
 			}
-
-			// ====================================================
-			// 10. 게임 진행 중
-			// ====================================================
-
 			else
 			{
 				dones[i] = 0;
 			}
 
 			// ====================================================
-			// 11. 최종 reward 저장
+			// 16. 최종 reward 저장
 			// ====================================================
 
 			rewards[i] = reward;
@@ -1332,6 +1717,7 @@ PYBIND11_MODULE(Quoridor, m) {
 	m.def("AStar_withPath", &AStar_withPath, "finds the nodes between Player and destination");
 	m.def("isGameOver", &isGameOver, "checks if the game is over and returns the winner");
 	m.def("GetValidActions", &GetValidActions, "gets a vector of valid actions");
+	m.def("GetMoveDestination", &GetMoveDestination, "check if the move is valid(FOR DEBUGGING USE ONLY)");
 	m.def("AStarNextMove", &AStarNextMove);
 	m.def(
 		"StepBatch",

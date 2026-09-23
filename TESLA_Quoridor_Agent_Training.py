@@ -10,8 +10,7 @@ from tensorflow.keras import Model, Sequential, mixed_precision
 from tensorflow.keras.layers import Dense, Embedding, Reshape
 from tensorflow.keras.optimizers import Adam
 
-mixed_precision.set_global_policy("mixed_float16")
-
+mixed_precision.set_global_policy("float32")
 from collections import deque
 import numpy as np
 import random
@@ -23,6 +22,7 @@ sys.path.insert(0, './build-linux')
 #print(Quoridor("Board"))
 
 import Quoridor
+
 '''
 Board = Quoridor.Quoridor()
 
@@ -88,6 +88,84 @@ print("Using device:", GPU_DEVICE)
 #맞는지는 보장 못함 ㅎ
 class Network:
 
+    @staticmethod
+    def residual_block(x, filters=128, block_id=0):
+        """
+        Quoridor용 Residual Block
+
+        x
+        │
+        ├───────────────┐
+        │               │
+        ▼               │
+      Conv 3×3          │
+      BatchNorm         │
+      LeakyReLU         │
+      Conv 3×3          │
+      BatchNorm         │
+        │               │
+        └── Add ◄───────┘
+             │
+         LeakyReLU
+        """
+
+        shortcut = x
+
+        # ------------------------------------------------------------
+        # Conv 1
+        # ------------------------------------------------------------
+
+        x = keras.layers.Conv2D(
+            filters=filters,
+            kernel_size=3,
+            padding="same",
+            use_bias=False,
+            name=f"res_{block_id}_conv1"
+        )(x)
+
+        x = keras.layers.BatchNormalization(
+            name=f"res_{block_id}_bn1"
+        )(x)
+
+        x = keras.layers.LeakyReLU(
+            negative_slope=0.1,
+            name=f"res_{block_id}_relu1"
+        )(x)
+
+        # ------------------------------------------------------------
+        # Conv 2
+        # ------------------------------------------------------------
+
+        x = keras.layers.Conv2D(
+            filters=filters,
+            kernel_size=3,
+            padding="same",
+            use_bias=False,
+            name=f"res_{block_id}_conv2"
+        )(x)
+
+        x = keras.layers.BatchNormalization(
+            name=f"res_{block_id}_bn2"
+        )(x)
+
+        # ------------------------------------------------------------
+        # Skip Connection
+        # ------------------------------------------------------------
+
+        x = keras.layers.Add(
+            name=f"res_{block_id}_add"
+        )([
+            shortcut,
+            x
+        ])
+
+        x = keras.layers.LeakyReLU(
+            negative_slope=0.1,
+            name=f"res_{block_id}_relu2"
+        )(x)
+
+        return x
+
     def __init__(
         self,
         nS,
@@ -103,43 +181,107 @@ class Network:
         self.nA = nA
         self.learning_rate = learning_rate
         self.scope = scope
+
         with tf.device(GPU_DEVICE):
-            # DQN 신경망
-            self.model = keras.Sequential([
-                keras.layers.Input(shape=(9, 9, 7)),
 
-                keras.layers.Conv2D(
-                    64,
-                    kernel_size=3,
-                    padding="same",
-                    activation="relu"
-                ),
+            # ========================================================
+            # Input
+            # ========================================================
 
-                keras.layers.Conv2D(
-                    128,
-                    kernel_size=3,
-                    padding="same",
-                    activation="relu"
-                ),
+            inputs = keras.layers.Input(
+                shape=(9, 9, 7),
+                name="board_input"
+            )
 
-                keras.layers.Conv2D(
-                    128,
-                    kernel_size=3,
-                    padding="same",
-                    activation="relu"
-                ),
+            # ========================================================
+            # Initial Convolution
+            # ========================================================
 
-                keras.layers.Flatten(),
+            x = keras.layers.Conv2D(
+                filters=128,
+                kernel_size=3,
+                padding="same",
+                use_bias=False,
+                name="initial_conv"
+            )(inputs)
 
-                Dense(512, activation="relu"),
-                Dense(256, activation="relu"),
+            x = keras.layers.BatchNormalization(
+                name="initial_bn"
+            )(x)
 
-                Dense(nA, activation=None, dtype="float32")
-            ])
+            x = keras.layers.LeakyReLU(
+                negative_slope=0.1,
+                name="initial_relu"
+            )(x)
+
+            # ========================================================
+            # Residual Tower
+            # ========================================================
+
+            for i in range(20):
+
+                x = self.residual_block(
+                    x,
+                    filters=128,
+                    block_id=i
+                )
+
+            # ========================================================
+            # Global Average Pooling
+            # ========================================================
+
+            x = keras.layers.GlobalAveragePooling2D(
+                name="global_average_pooling"
+            )(x)
+
+            # ========================================================
+            # Fully Connected
+            # ========================================================
+
+            x = keras.layers.Dense(
+                256,
+                name="dense_256"
+            )(x)
+
+            x = keras.layers.LeakyReLU(
+                negative_slope=0.1,
+                name="dense_relu"
+            )(x)
+
+            # ========================================================
+            # Q Value Head
+            # ========================================================
+
+            outputs = keras.layers.Dense(
+                nA,
+                activation=None,
+                dtype="float32",
+                name="q_values"
+            )(x)
+
+            # ========================================================
+            # Model
+            # ========================================================
+
+            self.model = keras.Model(
+                inputs=inputs,
+                outputs=outputs,
+                name=f"Quoridor_ResNet_DQN_{scope}"
+            )
+
+            self.model.summary()
+
+        # ============================================================
+        # Optimizer
+        # ============================================================
 
         self.optimizer = Adam(
             learning_rate=learning_rate
         )
+
+        # ============================================================
+        # Compile
+        # ============================================================
 
         self.model.compile(
             optimizer=self.optimizer,
@@ -170,8 +312,10 @@ class Network:
             dtype=np.float32
         )
 
-        return self.model.train_on_batch(s,target)
-        
+        return self.model.train_on_batch(
+            s,
+            target
+        )
 
 class Memory:
     '''
@@ -214,14 +358,14 @@ class DQNAgent:
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.9998
 
-        self.gamma = 0.99
+        self.gamma = 0.9998
 
         self.learning_rate = 0.0001
 
         self.batch_size = 128
 
         self.memory = Memory(
-            memory_size=250000
+            memory_size=500000
         )
 
         self.experiment_dir = os.path.abspath(
@@ -290,19 +434,9 @@ class DQNAgent:
         ).reshape(-1)
 
         if len(valid_actions) == 0:
-            print("\n========== NO VALID ACTION ==========")
-            print(f"Environment: {i}")
-            print(f"Board turn: {'P1' if env.board.isP1Turn else 'P2'}")
-            print(f"P1 position: {env.board.P1}")
-            print(f"P2 position: {env.board.P2}")
-            print(f"P1 walls: {env.board.WallCount[0]}")
-            print(f"P2 walls: {env.board.WallCount[1]}")
-            print(f"State shape: {states[i].shape}")
-            print(f"State min/max: {states[i].min()} / {states[i].max()}")
-            print("====================================\n")
 
             raise RuntimeError(
-                f"환경 {i}: Valid action이 없습니다."
+                "Valid action이 없습니다."
             )
 
         # 탐험
@@ -517,11 +651,8 @@ class DQNAgent:
 
         return loss
             
-    def get_valid_actions(self):
-        return Quoridor.GetValidActions(self.Board)
-    
         ###############################################################
-    @tf.function(jit_compile=True)
+    @tf.function
     def train_step(
         self,
         states,
@@ -660,88 +791,211 @@ class DQNAgent:
             )
 
         return loss
-        
 class Environment:
-    def __init__(self, debug = False):
-        #환경 초기화
+    def __init__(self, debug=False):
         self.board = None
         self.done = False
         self.winner = None
-        self.nA = 132 #보드의 상태에서 취할 수 있는 행동의 최대 가짓수
+
+        self.nA = 132
         self.debug = debug
+
+        # ==========================================
+        # 학습 모드
+        # ==========================================
+        # "astar"   : DQN vs A*
+        # "selfplay": DQN vs DQN
+        self.training_mode = "astar"
+
+        # astar 모드에서 DQN이 맡는 플레이어
+        # 1 = P1
+        # 2 = P2
+        self.dqn_player = 1
         
-    def reset(self):
-            self.board = Quoridor.Quoridor()
+    def reset(self, training_mode=None, dqn_player=None):
+        # ==========================================
+        # 새로운 보드 생성
+        # ==========================================
 
-            self.done = False
-            self.winner = None
+        self.board = Quoridor.Quoridor()
 
-            # 초기 최단거리
-            self.p1_distance = Quoridor.AStar(
-                self.board,
-                True
+        self.done = False
+        self.winner = None
+
+        # ==========================================
+        # 새로운 게임의 학습 모드 설정
+        # ==========================================
+
+        if training_mode is not None:
+            self.training_mode = training_mode
+
+        if dqn_player is not None:
+            self.dqn_player = dqn_player
+
+        # ==========================================
+        # 랜덤 초기 벽 배치
+        # ==========================================
+
+        self.setup_random_walls()
+
+        # ==========================================
+        # 초기 최단거리
+        # ==========================================
+
+        self.p1_distance = Quoridor.AStar(
+            self.board,
+            True
+        )
+
+        self.p2_distance = Quoridor.AStar(
+            self.board,
+            False
+        )
+
+        # ==========================================
+        # 초기 State
+        # ==========================================
+
+        if self.training_mode == "selfplay":
+            # self-play에서는 현재 행동할 플레이어 관점
+            current_player = (
+                1 if self.board.isP1Turn else 2
             )
 
-            self.p2_distance = Quoridor.AStar(
-                self.board,
-                False
+            return self.get_state(
+                player=current_player
             )
 
-            return self.get_state()
-        
-    def get_state(self):
+        else:
+            # DQN vs A*에서는 항상 DQN 플레이어 관점
+            return self.get_state(
+                player=self.dqn_player
+            )
+            
+    def get_state(self, player=None):
+        """
+        DQN 플레이어의 관점으로 보드를 표현한다.
+
+        P1 관점:
+            row 0 = 상대 진영
+            row 8 = 내 시작 진영
+
+        P2 관점:
+            실제 보드를 180도 회전
+            -> row 0 = 상대 진영
+            -> row 8 = 내 시작 진영
+
+        따라서 CNN 입장에서는 항상:
+
+            channel 0 = 나
+            channel 1 = 상대
+            row 8      = 내 시작 위치
+            row 0      = 상대 목표 방향
+
+        이 된다.
+        """
+
         state = np.zeros(
             (9, 9, 7),
             dtype=np.float32
         )
 
         # =========================================================
-        # 현재 플레이어 기준으로 state를 표현
+        # 현재 관점의 플레이어 결정
         # =========================================================
 
-        if self.board.isP1Turn:
+        if player is None:
+            player = 1 if self.board.isP1Turn else 2
 
-            # 나 = P1
+        # =========================================================
+        # 실제 보드에서 내 위치 / 상대 위치
+        # =========================================================
+
+        if player == 1:
+
             my_pos = self.board.P1
             opponent_pos = self.board.P2
 
             my_walls = self.board.WallCount[0]
             opponent_walls = self.board.WallCount[1]
 
+            rotate = False
+
         else:
 
-            # 나 = P2
             my_pos = self.board.P2
             opponent_pos = self.board.P1
 
             my_walls = self.board.WallCount[1]
             opponent_walls = self.board.WallCount[0]
 
+            # P2는 P1과 반대 방향으로 진행하므로
+            # CNN 입력에서는 보드를 180도 회전한다.
+            rotate = True
 
         # =========================================================
-        # 현재 플레이어
+        # 좌표 변환 함수
+        # =========================================================
+
+        def transform_position(pos):
+            r = int(pos[0])
+            c = int(pos[1])
+
+            if rotate:
+                return (
+                    8 - r,
+                    8 - c
+                )
+
+            return (
+                r,
+                c
+            )
+
+        # =========================================================
+        # 플레이어 위치
+        # =========================================================
+
+        my_r, my_c = transform_position(my_pos)
+
+        opponent_r, opponent_c = transform_position(
+            opponent_pos
+        )
+
+        # =========================================================
+        # Channel 0
+        # 나
         # =========================================================
 
         state[
-            my_pos[0],
-            my_pos[1],
+            my_r,
+            my_c,
             0
         ] = 1.0
 
-
         # =========================================================
-        # 상대 플레이어
+        # Channel 1
+        # 상대
         # =========================================================
 
         state[
-            opponent_pos[0],
-            opponent_pos[1],
+            opponent_r,
+            opponent_c,
             1
         ] = 1.0
 
-
         # =========================================================
-        # Horizontal walls
+        # Channel 2
+        # Horizontal Walls
+        #
+        # WallH[x]의 bit y
+        #
+        # 180도 회전:
+        #
+        # 원본 (x, y)
+        #     ↓
+        # 회전 (7-x, 7-y)
+        #
         # =========================================================
 
         for x in range(8):
@@ -750,15 +1004,30 @@ class Environment:
 
                 if self.board.WallH[x] & (1 << y):
 
+                    if rotate:
+
+                        new_x = 7 - x
+                        new_y = 7 - y
+
+                    else:
+
+                        new_x = x
+                        new_y = y
+
                     state[
-                        x,
-                        y,
+                        new_x,
+                        new_y,
                         2
                     ] = 1.0
 
-
         # =========================================================
-        # Vertical walls
+        # Channel 3
+        # Vertical Walls
+        #
+        # 원본 (x, y)
+        #     ↓
+        # 회전 (7-x, 7-y)
+        #
         # =========================================================
 
         for x in range(8):
@@ -767,36 +1036,72 @@ class Environment:
 
                 if self.board.WallVt[y] & (1 << x):
 
+                    if rotate:
+
+                        new_x = 7 - x
+                        new_y = 7 - y
+
+                    else:
+
+                        new_x = x
+                        new_y = y
+
                     state[
-                        x,
-                        y,
+                        new_x,
+                        new_y,
                         3
                     ] = 1.0
 
-
         # =========================================================
-        # Turn
+        # Channel 4
+        # 현재 턴인지
         #
-        # 현재 플레이어 관점이므로 항상 1
+        # DQN 관점에서:
+        #
+        #   1 = 지금 내가 행동할 차례
+        #   0 = 상대가 행동할 차례
+        #
         # =========================================================
 
-        state[:, :, 4] = 1.0
-
-
-        # =========================================================
-        # Wall count
-        # =========================================================
-
-        state[:, :, 5] = (
-            my_walls / 10.0
+        is_my_turn = (
+            (player == 1 and self.board.isP1Turn)
+            or
+            (player == 2 and not self.board.isP1Turn)
         )
 
-        state[:, :, 6] = (
-            opponent_walls / 10.0
-        )
+        if is_my_turn:
 
+            state[
+                :,
+                :,
+                4
+            ] = 1.0
+
+        # =========================================================
+        # Channel 5
+        # 내 Wall Count
+        # =========================================================
+
+        state[
+            :,
+            :,
+            5
+        ] = my_walls / 10.0
+
+        # =========================================================
+        # Channel 6
+        # 상대 Wall Count
+        # =========================================================
+
+        state[
+            :,
+            :,
+            6
+        ] = opponent_walls / 10.0
 
         return state
+
+
     
     def step(self, action):
         reward = 0.0
@@ -905,8 +1210,8 @@ class Environment:
         # 다음 상태
         # ==========================================
 
-        next_state = self.get_state()
-
+        next_state = self.get_state(player=acting_player)
+        
         return next_state, reward, done
 
     def execute_action(self, action):
@@ -955,11 +1260,285 @@ class Environment:
             self.done = True
             return True
         return False
-    
     def get_valid_actions(self):
-        return tuple(Quoridor.GetValidActions(self.board))
+        return tuple(
+            int(action)
+            for action in Quoridor.GetValidActions(
+                self.board
+            )
+        )
+
+    def get_dqn_valid_actions(self, player):
+        actual_actions = self.get_valid_actions()
+
+        return tuple(
+            transform_action(
+                action,
+                player
+            )
+            for action in actual_actions
+        )
+        
+    def setup_random_walls(self):
+        """
+        게임 시작 시 0~3 개의 랜덤한 합법 벽을 설치한다.
+
+        설치된 벽은 PlaceWallH / PlaceWallV를 통해
+        C++ 쪽 WallCount에서 자동으로 차감된다.
+
+        벽 설치가 끝난 후에는 항상 P1 턴으로 복구한다.
+        """
+
+        # ------------------------------------------
+        # 랜덤하게 설치할 벽 개수
+        # ------------------------------------------
+
+        wall_count = random.randint(0, 3)
+
+        placed_count = 0
+
+        # ------------------------------------------
+        # 최대 시도 횟수
+        # ------------------------------------------
+
+        max_attempts = 200
+        attempts = 0
+
+        while placed_count < wall_count:
+
+            attempts += 1
+
+            if attempts > max_attempts:
+                print(
+                    f"[RandomWall] "
+                    f"최대 시도 횟수 초과: "
+                    f"{placed_count}/{wall_count}"
+                )
+                break
+
+            # --------------------------------------
+            # 현재 가능한 행동
+            # --------------------------------------
+
+            valid_actions = list(
+                Quoridor.GetValidActions(
+                    self.board
+                )
+            )
+
+            # --------------------------------------
+            # 벽 행동만 추출
+            #
+            # 4 ~ 67   : Horizontal
+            # 68 ~ 131 : Vertical
+            # --------------------------------------
+
+            valid_wall_actions = [
+                int(action)
+                for action in valid_actions
+                if 4 <= int(action) < 132
+            ]
+
+            if not valid_wall_actions:
+                break
+
+            # --------------------------------------
+            # 랜덤 벽 선택
+            # --------------------------------------
+
+            action = random.choice(
+                valid_wall_actions
+            )
+
+            # --------------------------------------
+            # 벽 설치
+            # --------------------------------------
+
+            if action < 68:
+
+                wall_action = action - 4
+
+                x = wall_action // 8
+                y = wall_action % 8
+
+                result = Quoridor.PlaceWallH(
+                    self.board,
+                    [x, y]
+                )
+
+            else:
+
+                wall_action = action - 68
+
+                x = wall_action // 8
+                y = wall_action % 8
+
+                result = Quoridor.PlaceWallV(
+                    self.board,
+                    [x, y]
+                )
+
+            # --------------------------------------
+            # 설치 성공
+            # --------------------------------------
+
+            if result == 0:
+                placed_count += 1
+
+        # ------------------------------------------
+        # 시작 플레이어를 P1로 복구
+        # ------------------------------------------
+
+        self.board.isP1Turn = True
+        if self.debug == True:
+            print(
+                f"[RandomWall] "
+                f"Placed={placed_count} | "
+                f"P1 Walls={self.board.WallCount[0]} | "
+                f"P2 Walls={self.board.WallCount[1]} | "
+                f"P1 Distance={Quoridor.AStar(self.board, True)} | "
+                f"P2 Distance={Quoridor.AStar(self.board, False)}",
+                flush=True
+            )
+
+        return placed_count
+
+def transform_action(action, player):
+    """
+    DQN 관점의 action을 실제 C++ 보드 action으로 변환한다.
+
+    Action:
+        0 = 위
+        1 = 아래
+        2 = 왼쪽
+        3 = 오른쪽
+
+        4~67   = Horizontal Wall
+        68~131 = Vertical Wall
+    """
+
+    action = int(action)
+
+    # =========================================================
+    # P1
+    # =========================================================
+
+    if player == 1:
+        return action
+
+    # =========================================================
+    # P2
+    #
+    # 보드를 180도 회전했으므로
+    #
+    # 위 <-> 아래
+    # 왼쪽 <-> 오른쪽
+    #
+    # =========================================================
+
+    if action == 0:
+        return 1
+
+    if action == 1:
+        return 0
+
+    if action == 2:
+        return 3
+
+    if action == 3:
+        return 2
+
+    # =========================================================
+    # Wall action
+    #
+    # 180도 회전한 벽 action을 실제 보드 좌표로 변환
+    # =========================================================
+
+    if 4 <= action < 68:
+
+        wall_action = action - 4
+
+        x = wall_action // 8
+        y = wall_action % 8
+
+        new_x = 7 - x
+        new_y = 7 - y
+
+        return 4 + new_x * 8 + new_y
+
+    if 68 <= action < 132:
+
+        wall_action = action - 68
+
+        x = wall_action // 8
+        y = wall_action % 8
+
+        new_x = 7 - x
+        new_y = 7 - y
+
+        return 68 + new_x * 8 + new_y
+
+    raise ValueError(
+        f"Invalid action: {action}"
+    )
+
+def get_astar_action(env, player):
+    valid_actions = [
+        int(action)
+        for action in env.get_valid_actions()
+        if int(action) < 4
+    ]
+
+    if not valid_actions:
+        raise RuntimeError(
+            f"A* Player {player} has no valid movement action."
+        )
+
+    astar_action = int(
+        Quoridor.AStarNextMove(
+            env.board,
+            player == 1
+        )
+    )
+
+    if astar_action in valid_actions:
+        return astar_action
+
+    if astar_action == -1:
+        # 가장 단순한 안전 대체 동작
+        return valid_actions[0]
+
+    raise RuntimeError(
+        f"Unexpected A* action={astar_action}, "
+        f"valid_actions={valid_actions}, "
+        f"player={player}"
+    )
     
-#####################################################################################################
+def get_astar_wall_action(env):
+    """
+    현재 A* 플레이어가 설치할 수 있는 벽 중
+    하나를 랜덤하게 선택한다.
+
+    반환:
+        0 ~ 131 : 벽 action
+        None    : 설치 가능한 벽이 없음
+    """
+
+    valid_actions = list(
+        Quoridor.GetValidActions(env.board)
+    )
+
+    valid_wall_actions = [
+        int(action)
+        for action in valid_actions
+        if 4 <= int(action) < 132
+    ]
+
+    if not valid_wall_actions:
+        return None
+
+    return random.choice(valid_wall_actions)
+######################################################################
 
 ######################################################################
 # Parallel environments
@@ -986,7 +1565,59 @@ agent = DQNAgent(
     experiment_dir="./TESLA_Quoridor_AI"
 )
 
-EPISODES = 10000
+EPISODES = 100000 #~8시간 소요
+
+RESUME_FROM = "./TESLA_Quoridor_AI/dqn_episode_61000.weights.h5"
+
+RESUME = True
+
+if RESUME:
+    if not os.path.exists(RESUME_FROM):
+
+        raise FileNotFoundError(
+            f"\nWeight 파일을 찾을 수 없습니다.\n"
+            f"{os.path.abspath(RESUME_FROM)}"
+        )
+
+    # ============================================================
+    # 기존 Online Network 가중치 불러오기
+    # ============================================================
+
+    agent.model.model.load_weights(
+        RESUME_FROM
+    )
+
+    # ============================================================
+    # Target Network도 동일한 가중치로 초기화
+    # ============================================================
+
+    agent.target_model.model.set_weights(
+        agent.model.model.get_weights()
+    )
+    agent.epsilon = 0.3
+
+    print(
+        f"DQN model loaded successfully!\n"
+        f"Weight: {os.path.abspath(RESUME_FROM)}",
+        flush=True
+    )
+    envs
+    
+# ============================================================
+# 128개 환경 초기화
+# ============================================================
+
+for i, env in enumerate(envs):
+
+    env.training_mode = "astar"
+
+    # DQN을 P1/P2 중 랜덤 배정
+    env.dqn_player = random.choice([1, 2])
+
+    env.reset(
+        training_mode="astar",
+        dqn_player=env.dqn_player
+    )
 
 # ============================================================
 # 학습 시간 측정
@@ -996,6 +1627,11 @@ training_start_time = time.time()
 
 total_training_steps = 0
 finished_episodes = 0
+
+REPLAY_EVERY_BATCHES = 1
+REPLAY_UPDATES_PER_BATCH = 1
+
+training_batch_count = 0
 
 last_saved_episode = 0
 
@@ -1008,40 +1644,28 @@ episode_p2_rewards = np.zeros(NUM_ENVS, dtype=np.float32)
 # 각 환경에서 P1/P2의 마지막 transition을 저장
 # ==========================================================
 
-last_transitions = [
+pending_transitions = [
     {
         1: None,
         2: None
     }
     for _ in range(NUM_ENVS)
 ]
-
 episode_steps = np.zeros(
     NUM_ENVS,
     dtype=np.int32
 )
 
 ######################################################################
-# 초기화
+# Self-play / A* Training
 ######################################################################
 
-states = []
-
-for env in envs:
-
-    states.append(
-        env.reset()
-    )
-
-
-######################################################################
-# Self-play
-######################################################################
+ASTAR_WALL_THRESHOLD = 0.85
 
 while finished_episodes < EPISODES:
 
     ##################################################################
-    # 1. 현재 살아있는 환경 수집
+    # 1. 살아있는 환경 수집
     ##################################################################
 
     active_indices = []
@@ -1049,41 +1673,193 @@ while finished_episodes < EPISODES:
     active_valid_actions = []
 
     for i, env in enumerate(envs):
-
         if env.done:
             continue
 
         active_indices.append(i)
+        acting_player = (
+            1 if env.board.isP1Turn else 2
+        )
+
+        if env.training_mode == "selfplay":
+            dqn_player = acting_player
+        else:
+            dqn_player = env.dqn_player
 
         active_states.append(
-            states[i]
+            env.get_state(
+                player=dqn_player
+            )
         )
 
         active_valid_actions.append(
-            env.get_valid_actions()
+            env.get_dqn_valid_actions(
+                dqn_player
+            )
+        )
+        
+
+    ##################################################################
+    # 2. 행동 결정
+    ##################################################################
+
+    actions = [None] * len(active_indices)
+    
+    # Replay Memory에 저장할 DQN 관점 action
+    dqn_memory_actions = [None] * len(active_indices)
+
+    dqn_batch_indices = []
+    dqn_batch_states = []
+    dqn_batch_valid_actions = []
+
+    for batch_index, env_index in enumerate(active_indices):
+
+        env = envs[env_index]
+
+        acting_player = (
+            1 if env.board.isP1Turn else 2
         )
 
+        # ============================================================
+        # DQN 차례인지 확인
+        # ============================================================
+
+        if env.training_mode == "selfplay":
+
+            is_dqn_turn = True
+
+        else:
+
+            is_dqn_turn = (
+                acting_player == env.dqn_player
+            )
+
+        # ============================================================
+        # DQN
+        # ============================================================
+
+        if is_dqn_turn:
+
+            dqn_batch_indices.append(
+                batch_index
+            )
+
+            dqn_batch_states.append(
+                active_states[batch_index]
+            )
+
+            dqn_batch_valid_actions.append(
+                active_valid_actions[batch_index]
+            )
+
+        # ============================================================
+        # A*
+        # ============================================================
+
+        else:
+            # ============================================================
+            # A* 턴
+            # ============================================================
+
+            # 난수 생성
+            random_value = random.random()
+
+            # ------------------------------------------------------------
+            # 일정 확률로 랜덤 벽 설치
+            # ------------------------------------------------------------
+
+            if random_value >= ASTAR_WALL_THRESHOLD:
+
+                wall_action = get_astar_wall_action(env)
+
+                if wall_action is not None:
+                    actions[batch_index] = wall_action
+
+                    if env.debug:
+                        print(
+                            f"[A* WALL] "
+                            f"Player={acting_player} | "
+                            f"Random={random_value:.4f} | "
+                            f"Action={wall_action}",
+                            flush=True
+                        )
+
+                else:
+                    # 설치 가능한 벽이 없으면 A* 이동
+                    actions[batch_index] = get_astar_action(
+                        env,
+                        acting_player
+                    )
+
+            # ------------------------------------------------------------
+            # 나머지는 정상적인 A* 이동
+            # ------------------------------------------------------------
+
+            else:
+
+                actions[batch_index] = get_astar_action(
+                    env,
+                    acting_player
+                )
 
     ##################################################################
-    # 모든 환경이 종료된 경우
+    # 3. DQN Batch Inference
+    ##################################################################
+    if len(dqn_batch_states) > 0:
+
+        dqn_actions = agent.act_batch(
+            dqn_batch_states,
+            dqn_batch_valid_actions
+        )
+
+        for local_index, batch_index in enumerate(
+            dqn_batch_indices
+        ):
+
+            env_index = active_indices[batch_index]
+
+            env = envs[env_index]
+
+            dqn_action = int(
+                dqn_actions[local_index]
+            )
+
+            # Replay Memory에는 DQN 관점 action 저장
+            dqn_memory_actions[batch_index] = dqn_action
+
+            # 실제 플레이어
+            if env.training_mode == "astar":
+
+                dqn_player = env.dqn_player
+
+            else:
+
+                dqn_player = (
+                    1 if env.board.isP1Turn
+                    else 2
+                )
+
+            # DQN 관점 → 실제 C++ 보드 관점
+            actions[batch_index] = transform_action(
+                dqn_action,
+                dqn_player
+            )
+            
+    ##################################################################
+    # 4. 행동 검증
     ##################################################################
 
-    if len(active_indices) == 0:
-        continue
+    for batch_index, action in enumerate(actions):
 
+        if action is None:
 
-    ##################################################################
-    # 2. GPU에서 128개 환경의 action을 한 번에 계산
-    ##################################################################
-
-    actions = agent.act_batch(
-        active_states,
-        active_valid_actions
-    )
-
+            raise RuntimeError(
+                f"Action이 지정되지 않았습니다. "
+                f"batch_index={batch_index}"
+            )
 
     ##################################################################
-    # 3. StepBatch용 데이터 생성
+    # 5. StepBatch용 데이터
     ##################################################################
 
     active_boards = [
@@ -1106,11 +1882,8 @@ while finished_episodes < EPISODES:
         for i in active_indices
     ]
 
-
     ##################################################################
-    # 4. C++ StepBatch
-    #
-    # 여기서 128개의 환경이 한 번에 C++로 들어감
+    # 6. C++ StepBatch
     ##################################################################
 
     rewards, dones, p1_distances, p2_distances = (
@@ -1123,16 +1896,20 @@ while finished_episodes < EPISODES:
         )
     )
 
-
     ##################################################################
-    # 5. 각 환경의 결과 처리
+    # 7. 환경 결과 처리
     ##################################################################
 
-    for batch_index, env_index in enumerate(active_indices):
-
+    for batch_index, env_index in enumerate(
+        active_indices
+    ):
         env = envs[env_index]
 
-        state = states[env_index].copy()
+        # ============================================================
+        # 행동 정보
+        # ============================================================
+
+        acting_player = active_acting_players[batch_index]
 
         action = int(
             actions[batch_index]
@@ -1146,19 +1923,31 @@ while finished_episodes < EPISODES:
             dones[batch_index]
         )
 
+        # ============================================================
+        # 행동 직전 state
+        #
+        # active_states는 StepBatch 실행 전에 생성되었으므로
+        # 여기서는 이것을 사용해야 한다.
+        # ============================================================
 
-        ################################################################
-        # 행동한 플레이어
-        ################################################################
+        current_state = active_states[batch_index]
+        # ============================================================
+        # DQN 차례인지
+        # ============================================================
 
-        acting_player = active_acting_players[
-            batch_index
-        ]
+        if env.training_mode == "selfplay":
 
+            is_dqn_turn = True
 
-        ################################################################
+        else:
+
+            is_dqn_turn = (
+                acting_player == env.dqn_player
+            )
+
+        # ============================================================
         # A* 거리 업데이트
-        ################################################################
+        # ============================================================
 
         env.p1_distance = int(
             p1_distances[batch_index]
@@ -1168,17 +1957,15 @@ while finished_episodes < EPISODES:
             p2_distances[batch_index]
         )
 
-
-        ################################################################
-        # Episode step 증가
-        ################################################################
+        # ============================================================
+        # Episode step
+        # ============================================================
 
         episode_steps[env_index] += 1
 
-
-        ################################################################
+        # ============================================================
         # 200턴 무승부
-        ################################################################
+        # ============================================================
 
         is_draw = False
 
@@ -1186,88 +1973,28 @@ while finished_episodes < EPISODES:
             not done
             and episode_steps[env_index] >= 200
         ):
-            DRAW_PENALTY = -80.0
 
+            #DRAW_PENALTY = -80.0
             is_draw = True
 
-            # ==========================================================
-            # 현재 행동한 플레이어
-            # ==========================================================
-
-            reward += DRAW_PENALTY
-
             done = True
+
             env.done = True
             env.winner = 0
 
-            # ==========================================================
-            # 상대 플레이어의 마지막 transition도
-            # 무승부(-80) terminal transition으로 저장
-            # ==========================================================
-
-            opponent_player = 2 if acting_player == 1 else 1
-
-            opponent_transition = (
-                last_transitions[env_index][opponent_player]
-            )
-
-            if opponent_transition is not None:
-
-                (
-                    opp_state,
-                    opp_action,
-                    opp_reward,
-                    opp_next_state,
-                    opp_done,
-                    opp_next_valid_actions
-                ) = opponent_transition
-
-                agent.memory.add_memory(
-                    opp_state,
-                    opp_action,
-                    DRAW_PENALTY,
-                    opp_next_state,
-                    True,
-                    ()
-                )
-
-        ################################################################
-        # done 상태 반영
-        ################################################################
+        # ============================================================
+        # done 저장
+        # ============================================================
 
         env.done = done
 
-
-        ################################################################
-        # 다음 상태
-        ################################################################
-
-        next_state = env.get_state()
-
-
-        ################################################################
-        # 다음 valid actions
-        ################################################################
-
-        if done:
-
-            next_valid_actions = ()
-
-        else:
-
-            next_valid_actions = (
-                env.get_valid_actions()
-            )
-
-
-        ################################################################
+        # ============================================================
         # Reward 누적
-        ################################################################
+        # ============================================================
 
         episode_rewards[
             env_index
         ] += reward
-
 
         if acting_player == 1:
 
@@ -1281,119 +2008,210 @@ while finished_episodes < EPISODES:
                 env_index
             ] += reward
 
+        # ========================================================
+        # DQN transition 임시 저장
+        #
+        # 중요:
+        # 여기서는 next_state를 저장하지 않는다.
+        #
+        # 현재 DQN 행동
+        #       ↓
+        # 상대방 행동
+        #       ↓
+        # 다시 DQN 차례
+        #
+        # 가 되었을 때 next_state를 결정한다.
+        # ========================================================
 
-        ################################################################
-        # Training step
-        ################################################################
+        if is_dqn_turn:
 
-        total_training_steps += 1
+            old_pending = pending_transitions[env_index][acting_player]
 
-        # ==========================================================
-        # 현재 플레이어의 마지막 transition 저장
-        # ==========================================================
+            # ========================================================
+            # 이전 DQN 행동을 이번 state에서 종료
+            #
+            # P1 행동
+            #   ↓
+            # 상대 행동
+            #   ↓
+            # 다시 P1 턴
+            #
+            # 이 시점의 current_state가 이전 transition의 next_state
+            # ========================================================
 
-        last_transitions[env_index][acting_player] = (
-            state.copy(),
-            action,
-            reward,
-            next_state.copy(),
-            done,
-            next_valid_actions
-        )
+            if old_pending is not None:
 
-        ################################################################
-        # Replay Memory
-        ################################################################
-        
-        agent.memory.add_memory(
-            state,
-            action,
-            reward,
-            next_state,
-            done,
-            next_valid_actions
-        )
+                agent.memory.add_memory(
+                    old_pending["state"],
+                    old_pending["action"],
+                    old_pending["reward"],
+                    current_state.copy(),
+                    False,
+                    tuple(active_valid_actions[batch_index])
+                )
 
+            # ========================================================
+            # 현재 DQN 행동을 pending으로 저장
+            # ========================================================
 
-        ################################################################
-        # 상태 업데이트
-        ################################################################
+            pending_transitions[env_index][acting_player] = {
+                "state": current_state.copy(),
+                "action": dqn_memory_actions[batch_index],
 
-        states[
-            env_index
-        ] = next_state
+                "p1_distance": int(
+                    active_prev_p1_distances[batch_index]
+                ),
 
+                "p2_distance": int(
+                    active_prev_p2_distances[batch_index]
+                ),
 
-        ################################################################
-        # Replay
-        ################################################################
+                "reward": reward
+            }
 
-        if total_training_steps % 4 == 0:
-
-            loss = agent.replay()
-
-
-        ################################################################
-        # Target Network
-        ################################################################
-
-        if total_training_steps % 1000 == 0:
-
-            agent.update_target_model()
-
-            print(
-                f"[TRAIN] "
-                f"steps={total_training_steps} "
-                f"memory={len(agent.memory)} "
-                f"epsilon={agent.epsilon:.4f}",
-                flush=True
-            )
-
-
-        ################################################################
-        # Winner 확인
-        ################################################################
+        # ============================================================
+        # Episode 종료
+        # ============================================================
 
         if done:
 
-            winner = Quoridor.isGameOver(env.board)
+            if is_draw:
+
+                winner = 0
+
+            else:
+
+                winner = Quoridor.isGameOver(
+                    env.board
+                )
 
             env.winner = winner
-        ################################################################
-        # Episode 종료
-        ################################################################
+         
+            # ========================================================
+            # 게임 종료 시 DQN 최종 transition 처리
+            # ========================================================
 
-        if done:
+            if env.training_mode == "selfplay":
+
+                # P1, P2 모두 DQN
+                players_to_finalize = (1, 2)
+
+            else:
+
+                # DQN vs A*
+                players_to_finalize = (env.dqn_player,)
+
+
+            for player in players_to_finalize:
+
+                pending = (
+                    pending_transitions[
+                        env_index
+                    ][player]
+                )
+
+                # 해당 플레이어의 pending transition이 없으면 넘어감
+                if pending is None:
+                    continue
+
+                # ====================================================
+                # Terminal reward
+                # ====================================================
+
+                if winner == 0:
+
+                    # 200턴 무승부
+                    terminal_reward = -80.0
+
+                elif winner == player:
+
+                    # DQN 승리
+                    terminal_reward = 50.0
+
+                else:
+
+                    # DQN 패배
+                    terminal_reward = -50.0
+                    
+                episode_rewards[env_index] += terminal_reward
+
+                if player == 1:
+                    episode_p1_rewards[env_index] += terminal_reward
+                else:
+                    episode_p2_rewards[env_index] += terminal_reward
+
+                # ====================================================
+                # 기존 reward + terminal reward
+                # ====================================================
+
+                final_reward = (
+                    pending["reward"]
+                    + terminal_reward
+                )
+
+                # ====================================================
+                # Terminal state
+                #
+                # 게임이 끝났으므로 다음 상태는 의미가 없음.
+                # ====================================================
+
+                terminal_state = np.zeros_like(
+                    pending["state"]
+                )
+
+                # ====================================================
+                # Replay Memory 저장
+                # ====================================================
+
+                agent.memory.add_memory(
+                    pending["state"],
+                    pending["action"],
+                    final_reward,
+                    terminal_state,
+                    True,
+                    ()
+                )
+
+                # ====================================================
+                # Pending transition 제거
+                # ====================================================
+
+                pending_transitions[
+                    env_index
+                ][player] = None
+
+            # ========================================================
+            # Episode count
+            # ========================================================
 
             finished_episodes += 1
+
+            # ========================================================
+            # 시간 계산
+            # ========================================================
 
             elapsed_time = (
                 time.time()
                 - training_start_time
             )
 
-
-            ################################################################
-            # 평균 Episode 시간
-            ################################################################
-
             avg_episode_time = (
                 elapsed_time
-                / max(1, finished_episodes)
+                / max(
+                    1,
+                    finished_episodes
+                )
             )
-
 
             remaining_episodes = (
                 EPISODES
                 - finished_episodes
             )
 
-
             estimated_remaining_time = (
                 avg_episode_time
                 * remaining_episodes
             )
-
 
             remaining_hours = int(
                 estimated_remaining_time
@@ -1406,13 +2224,13 @@ while finished_episodes < EPISODES:
             )
 
             remaining_seconds = int(
-                estimated_remaining_time % 60
+                estimated_remaining_time
+                % 60
             )
 
-
-            ################################################################
+            # ========================================================
             # 모델 저장
-            ################################################################
+            # ========================================================
 
             if finished_episodes % 1000 == 0:
 
@@ -1430,45 +2248,63 @@ while finished_episodes < EPISODES:
                     flush=True
                 )
 
-
-            ################################################################
+            # ========================================================
             # Winner
-            ################################################################
-
-            winner = env.winner
+            # ========================================================
 
             if winner == 0:
 
                 winner_text = "--"
-
             else:
-
-                winner_text = f"P{winner}"
-
-
-            ################################################################
-            # Episode 결과
-            ################################################################
-
-            winner = env.winner
-
-            if winner == 0:
-                winner_text = "--"
-            else:
-                winner_text = f"P{winner}"
-                
-            display_p1_reward = episode_p1_rewards[env_index]
-            display_p2_reward = episode_p2_rewards[env_index]
-            
-            if winner == 0:
-                if acting_player == 1:
-                    display_p2_reward -= 180.0
+                if env.training_mode == "astar":
+                    if winner == env.dqn_player: 
+                        winner_text = "DQN" 
+                    else: winner_text = "A*"
                 else:
-                    display_p1_reward -= 180.0
+                    winner_text = f"P{winner}"
+
+            # ========================================================
+            # Reward 표시
+            # ========================================================
+
+            display_p1_reward = (
+                episode_p1_rewards[
+                    env_index
+                ]
+            )
+
+            display_p2_reward = (
+                episode_p2_rewards[
+                    env_index
+                ]
+            )
+
+            # ========================================================
+            # Mode
+            # ========================================================
+
+            if env.training_mode == "astar":
+
+                mode_text = (
+                    f"DQN(P{env.dqn_player}) vs A*"
+                )
+
+            else:
+
+                mode_text = (
+                    "DQN(P1) vs DQN(P2)"
+                )
+
+            # ========================================================
+            # 출력
+            # ========================================================
 
             print(
                 f"Episode: "
                 f"{finished_episodes}/{EPISODES} | "
+
+                f"Mode: "
+                f"{mode_text} | "
 
                 f"Winner: "
                 f"{winner_text} | "
@@ -1476,8 +2312,11 @@ while finished_episodes < EPISODES:
                 f"Total Reward: "
                 f"{episode_rewards[env_index]:.2f} | "
 
-                f"P1 Reward: {display_p1_reward:.2f} | "
-                f"P2 Reward: {display_p2_reward:.2f} | "
+                f"P1 Reward: "
+                f"{display_p1_reward:.2f} | "
+
+                f"P2 Reward: "
+                f"{display_p2_reward:.2f} | "
 
                 f"Steps: "
                 f"{episode_steps[env_index]} | "
@@ -1496,15 +2335,36 @@ while finished_episodes < EPISODES:
                 flush=True
             )
 
+            # ========================================================
+            # 다음 게임의 학습 방식
+            # ========================================================
 
-            ################################################################
-            # 새 게임 시작
-            ################################################################
+            if finished_episodes < 12000:
 
-            states[
-                env_index
-            ] = env.reset()
+                new_training_mode = "astar"
 
+                new_dqn_player = random.choice(
+                    [1, 2]
+                )
+
+            else:
+
+                new_training_mode = "selfplay"
+
+                new_dqn_player = 1
+
+            # ========================================================
+            # 새 게임
+            # ========================================================
+
+            env.reset(
+                training_mode=new_training_mode,
+                dqn_player=new_dqn_player
+            )
+
+            # ========================================================
+            # Reward 초기화
+            # ========================================================
 
             episode_rewards[
                 env_index
@@ -1521,13 +2381,60 @@ while finished_episodes < EPISODES:
             episode_steps[
                 env_index
             ] = 0
-            
-            # 새 게임이므로 이전 게임의 마지막 transition 삭제
-            last_transitions[env_index][1] = None
-            last_transitions[env_index][2] = None
 
     ##################################################################
-    # Epsilon 감소
+    # 8. Batch 전체 처리 완료
+    ##################################################################
+    batch_step_count = len(
+        active_indices
+    )
+
+    total_training_steps += (
+        batch_step_count
+    )
+
+    training_batch_count += 1
+
+    if (
+        training_batch_count
+        % REPLAY_EVERY_BATCHES
+        == 0
+    ):
+
+        for _ in range(
+            REPLAY_UPDATES_PER_BATCH
+        ):
+
+            loss = agent.replay()
+
+
+    ##################################################################
+    # 10. Target Network
+    ##################################################################
+
+    previous_step_count = (
+        total_training_steps
+        - batch_step_count
+    )
+
+    if (
+        total_training_steps // 1000
+        >
+        previous_step_count // 1000
+    ):
+
+        agent.update_target_model()
+
+        print(
+            f"[TRAIN] "
+            f"steps={total_training_steps} "
+            f"memory={len(agent.memory)} "
+            f"epsilon={agent.epsilon:.4f}",
+            flush=True
+        )
+
+    ##################################################################
+    # 11. Epsilon
     ##################################################################
 
     agent.epsilon_update()
