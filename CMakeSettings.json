@@ -9,7 +9,14 @@
       "installRoot": "${projectDir}\\out\\install\\${name}",
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
-      "ctestCommandArgs": ""
+      "ctestCommandArgs": "",
+      "variables": [
+        {
+          "name": "pybind11_DIR",
+          "value": "C:/Users/yujoo/source/repos/yujoonp/TESLA_Quoridor_AI/.venv/Lib/site-packages/pybind11/include/pybind11",
+          "type": "PATH"
+        }
+      ]
     }
   ]
 }
