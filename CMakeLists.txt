@@ -176,11 +176,16 @@ find_package(OpenMP REQUIRED)
 # Quoridor Python module
 # ============================================================
 
+if(MSVC)
+    add_compile_options(/utf-8)
+endif()
+
 pybind11_add_module(
     Quoridor
-    TESLA_Quoridor_AI.cpp
+    AlphaZero_Quoridor_Engine.cpp
+    Quoridor_MCTS_Engine.cpp
 )
-
+#    TESLA_Quoridor_AI.cpp
 
 # ============================================================
 # OpenMP 연결
