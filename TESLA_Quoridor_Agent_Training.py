@@ -624,65 +624,111 @@ class Environment:
         return state.flatten()
     
     def step(self, action):
+
         acting_player = 1 if self.board.isP1Turn else 2
 
-        # 행동 전
+        # =========================
+        # 이전 상태
+        # =========================
+
         prev_p1_distance = self.p1_distance
         prev_p2_distance = self.p2_distance
 
-        # 행동 실행
+        # =========================
+        # 행동
+        # =========================
+
         self.execute_action(action)
 
-        if (action > 4):
-            #AI가 벽을 설치했을때
-            reward -= 0.5 #한턴을 소모하는 것이기에, 기본적으로 차감
-            # 행동 후
-            self.p1_distance = Quoridor.AStar(
-                self.board,
-                True
-            )
+        # =========================
+        # 새로운 최단거리
+        # =========================
+
+        self.p1_distance = Quoridor.AStar(
+            self.board,
+            True
+        )
 
             self.p2_distance = Quoridor.AStar(
                 self.board,
                 False
             )
 
-            # 변화량
-            p1_progress = (
-                prev_p1_distance - self.p1_distance
-            )
+        # =========================
+        # 거리 변화
+        # =========================
+
+        p1_progress = (
+            prev_p1_distance - self.p1_distance
+        )
 
             p2_progress = (
                 prev_p2_distance - self.p2_distance
             )
 
-            # 보상
-            if acting_player == 1:
-                reward = (
-                    0.5 * p1_progress
-                    + 0.5 * (-p2_progress)
-                )
+        # =========================
+        # 내 거리 / 상대 거리
+        # =========================
 
-            else:
-                reward = (
-                    0.5 * p2_progress
-                    + 0.5 * (-p1_progress)
-                )
+        if acting_player == 1:
+
+            my_progress = p1_progress
+            opponent_progress = p2_progress
+
+            old_advantage = (
+                prev_p2_distance
+                - prev_p1_distance
+            )
+
+            new_advantage = (
+                self.p2_distance
+                - self.p1_distance
+            )
+
         else:
-            reward -= 0.2
-            if (acting_player == 1):
-                reward += 0.3*(prev_p2_distance - prev_p1_distance)
-            else:
-                reward -= 0.3*(prev_p2_distance - prev_p1_distance)
-            #플레이어가 움직일때, 상대보다 멀때는 패널티를, 상대보다 가까울때는 보상을 줌.
-        
+
+            my_progress = p2_progress
+            opponent_progress = p1_progress
+
+            old_advantage = (
+                prev_p1_distance
+                - prev_p2_distance
+            )
+
+            new_advantage = (
+                self.p1_distance
+                - self.p2_distance
+            )
+
+        # =========================
+        # 보상
+        # =========================
+
+        reward = 0.0
+
+        # ① 내 최단경로 단축
+        reward += 1.0 * my_progress
+
+        # ② 상대 최단경로 증가
+        reward += 0.3 * (-opponent_progress)
+
+        # ③ 나와 상대의 거리 차이가 유리해졌는가
+        reward += 0.2 * (
+            new_advantage - old_advantage
+        )
+
+        # ④ 행동 비용
+        reward -= 1
+
+        # =========================
         # 게임 종료
+        # =========================
+
         winner = Quoridor.isGameOver(
             self.board
         )
 
         done = winner != 0
-
         if done:
 
             if winner == acting_player:
@@ -692,23 +738,9 @@ class Environment:
 
             self.winner = winner
             self.done = True
-
-        # 디버깅
-        if self.debug:
-
-            print(
-                f"P{acting_player} | "
-                f"Action={action} | "
-                f"P1: {prev_p1_distance}->{self.p1_distance} | "
-                f"P2: {prev_p2_distance}->{self.p2_distance} | "
-                f"P1 progress={p1_progress:+d} | "
-                f"P2 progress={p2_progress:+d} | "
-                f"Reward={reward:+.2f}",
-                flush=True
-            )
-
+            
         next_state = self.get_state()
-
+        
         return next_state, reward, done
 
     def execute_action(self, action):
@@ -735,7 +767,6 @@ class Environment:
                 self.board,
                 [x, y]
             )
-
         # 세로벽
         else:
 
@@ -790,7 +821,7 @@ agent = DQNAgent(
     experiment_dir="./TESLA_Quoridor_AI"
 )
 
-EPISODES = 50000
+EPISODES = 10000
 
 # ============================================================
 # 학습 시간 측정
@@ -1017,7 +1048,7 @@ while finished_episodes < EPISODES:
                 remaining_seconds = int(
                     estimated_remaining_time % 60
                 )
-            if finished_episodes % 5000 == 0:
+            if finished_episodes % 1000 == 0:
                 save_path = (
                     "./TESLA_Quoridor_AI/"
                     f"dqn_episode_{finished_episodes}.weights.h5"
@@ -1033,7 +1064,7 @@ while finished_episodes < EPISODES:
             winner = env.winner
 
             print(
-                f"Episode: {finished_episodes} | "
+                f"Episode: {finished_episodes}/{EPISODES} | "
                 f"Winner: P{winner} | "
                 f"Total Reward: "
                 f"{episode_rewards[env_index]:.2f} | "
@@ -1116,7 +1147,7 @@ while finished_episodes < EPISODES:
                 )
             finished_episodes += 1
             print(
-                f"Episode: {finished_episodes} | "
+                f"Episode: {finished_episodes}/{EPISODES} | "
                 f"Winner: None | "
                 f"Total Reward: "
                 f"{episode_rewards[env_index]:.2f} | "

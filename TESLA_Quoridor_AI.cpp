@@ -1,5 +1,6 @@
 ﻿#include <stdio.h>
 #include <stdlib.h>
+#include <iostream>
 #include <algorithm>
 #include <vector>
 #include <queue>
@@ -240,9 +241,9 @@ int AStar(Quoridor* Board, bool isP1Turn) {
 	std::vector<std::array<uint8_t, 2>> AStar_ClosedNodes; //닫힌 리스트 선언(닫힌 리스트는 비용 고려를 할 필요가 없으니, 벡터 행렬로 압축
 	int Destination = isP1Turn ? 0 : 8; // 목적지 설정
 	struct AStar_Node RootNode = { 0, };
-	if (RootNode.Position[0] == Destination) { return 0; } //바로 도착
 	RootNode.Position[0] = isP1Turn ? Board->P1[0] : Board->P2[0]; // 루트 노드 위치 (플레이어의 위치)
 	RootNode.Position[1] = isP1Turn ? Board->P1[1] : Board->P2[1];
+	if (RootNode.Position[0] == Destination) { return 0; } //바로 도착
 
 	RootNode.HeuristicCost = AStar_HeuristicCost(&RootNode, Destination); //루트 노드 휴리스틱
 	RootNode.AccumulatedCost = 0; //루트 노드라서 누적 비용 = 0
