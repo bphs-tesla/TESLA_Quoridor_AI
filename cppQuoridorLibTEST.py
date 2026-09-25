@@ -6,8 +6,6 @@ sys.path.append('../TESLA_Quoridor_AI')
 
 import Quoridor
 
-import Quoridor
-
 Board = Quoridor.Quoridor()
 '''
 #Board.P1 = [0, 0]

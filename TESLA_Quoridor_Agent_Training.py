@@ -622,6 +622,7 @@ class Environment:
 
 
         return state.flatten()
+    
     def step(self, action):
         acting_player = 1 if self.board.isP1Turn else 2
 
@@ -632,41 +633,49 @@ class Environment:
         # 행동 실행
         self.execute_action(action)
 
-        # 행동 후
-        self.p1_distance = Quoridor.AStar(
-            self.board,
-            True
-        )
-
-        self.p2_distance = Quoridor.AStar(
-            self.board,
-            False
-        )
-
-        # 변화량
-        p1_progress = (
-            prev_p1_distance - self.p1_distance
-        )
-
-        p2_progress = (
-            prev_p2_distance - self.p2_distance
-        )
-
-        # 보상
-        if acting_player == 1:
-
-            reward = (
-                0.5 * p1_progress
-                + 0.5 * (-p2_progress)
+        if (action > 4):
+            #AI가 벽을 설치했을때
+            reward -= 0.5 #한턴을 소모하는 것이기에, 기본적으로 차감
+            # 행동 후
+            self.p1_distance = Quoridor.AStar(
+                self.board,
+                True
             )
 
+            self.p2_distance = Quoridor.AStar(
+                self.board,
+                False
+            )
+
+            # 변화량
+            p1_progress = (
+                prev_p1_distance - self.p1_distance
+            )
+
+            p2_progress = (
+                prev_p2_distance - self.p2_distance
+            )
+
+            # 보상
+            if acting_player == 1:
+                reward = (
+                    0.5 * p1_progress
+                    + 0.5 * (-p2_progress)
+                )
+
+            else:
+                reward = (
+                    0.5 * p2_progress
+                    + 0.5 * (-p1_progress)
+                )
         else:
-
-            reward = (
-                0.5 * p2_progress
-                + 0.5 * (-p1_progress)
-            )
-
+            reward -= 0.2
+            if (acting_player == 1):
+                reward += 0.3*(prev_p2_distance - prev_p1_distance)
+            else:
+                reward -= 0.3*(prev_p2_distance - prev_p1_distance)
+            #플레이어가 움직일때, 상대보다 멀때는 패널티를, 상대보다 가까울때는 보상을 줌.
+        
         # 게임 종료
         winner = Quoridor.isGameOver(
             self.board

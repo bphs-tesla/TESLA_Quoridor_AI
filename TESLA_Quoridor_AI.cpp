@@ -109,6 +109,67 @@ struct Quoridor
 		}
 		putchar('+'); for (int _ = 0; _ < 7 * 9 + 8; _++) { putchar('-'); }printf("+\n");
 	}
+
+	void PrintBoard_Small(char GridPoint) {
+		//이거는 UI관련이라 대놓고 개같이 짤거임 ㅅㄱ
+		//Quoridor를 받아서, 그에 대응되는 쿼리도 보드를 출력함
+		putchar('+'); for (int _ = 0; _ < 9 + 8; _++) { putchar('-'); }printf("+\n");
+		for (int i = 0; i < 9 + 8; i++) {
+			if (i % 2 == 0) {
+				//짝수(세로벽 설치)
+					printf("|");
+					for (int j = 0; j < 9 + 8; j++) {
+						if (j % 2 == 0) {
+							//칸
+							if ((this->P1[0] == i / 2) && (this->P1[1] == j / 2)) {
+								printf("1");
+							}
+							else if ((this->P2[0] == i / 2) && (this->P2[1] == j / 2)) {
+								printf("2");
+							}
+							else {
+								printf(" ");
+							}
+						}
+						else {
+							//세로벽
+							if ((this->Path.at(i / 2).at(j / 2).at(3) == 0) && (this->Path.at(i / 2).at(j / 2 + 1).at(2) == 0)) {
+								//벽 존재
+								printf("|");
+								continue;
+							}
+							printf(" ");
+						}
+					}
+					printf("|\n");
+			}
+			else {
+				//홀수(가로벽 설치)
+				printf("|");
+				for (int j = 0; j < 9 + 8; j++) {
+					if (j % 2 == 0) {
+						//가로벽
+						if ((this->Path[i / 2][j / 2][1] == 0) && (this->Path[i / 2 + 1][(j / 2)][0] == 0)) {
+							//벽 존재
+							printf("=");
+							continue;
+						}
+						printf(" ");
+
+					}
+					else {
+						//격자점
+						putchar(GridPoint);
+
+					}
+				}
+				printf("|\n");
+			}
+
+
+		}
+		putchar('+'); for (int _ = 0; _ < 9 + 8; _++) { putchar('-'); }printf("+\n");
+	}
 };
 
 bool isWall(Quoridor* Board, std::array<uint8_t, 2> GridPos) {
@@ -551,9 +612,11 @@ int main() {
 	for (int i = 0; i < 8; i++, GridWallPos.at(1)++) {
 		PlaceWallH(&Board, GridWallPos);
 	}
+	PlaceWallV(&Board, { 1,7 });
 	//PlaceWallVt(&Board, V2);
 	printf("Distance: %d\n\n", AStar(&Board, Board.isP1Turn));
 	Board.PrintBoard();
+	Board.PrintBoard_Small('.');
 	/*
 
 		switch (Board.isLegalMove(0b11010011)) {
@@ -625,6 +688,7 @@ PYBIND11_MODULE(Quoridor, m) {
 	pybind11::class_<Quoridor>(m, "Quoridor")
 		.def(pybind11::init<>())// 생성자 바인딩 (필요 시)
 		.def("PrintBoard", &Quoridor::PrintBoard)
+		.def("PrintBoard_Small", &Quoridor::PrintBoard_Small)
 		.def_readwrite("WallH", &Quoridor::WallH)
 		.def_readwrite("WallVt", &Quoridor::WallVt)
 		.def_readwrite("P1", &Quoridor::P1)
