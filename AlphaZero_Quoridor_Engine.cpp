@@ -1250,6 +1250,7 @@ pybind11::array_t<float> GetStateBatch(
 
 		const int Player = Players[n];
 
+		// 잘못된 Player
 		if (Player != 1 && Player != 2)
 		{
 			continue;
@@ -1305,9 +1306,9 @@ pybind11::array_t<float> GetStateBatch(
 				{
 					data[
 						base
-							+ x * 9 * 7
-							+ y * 7
-							+ c
+						+ x * 9 * 7
+						+ y * 7
+						+ c
 					] = 0.0f;
 				}
 			}
@@ -1321,9 +1322,9 @@ pybind11::array_t<float> GetStateBatch(
 
 		data[
 			base
-				+ MyPosition[0] * 9 * 7
-				+ MyPosition[1] * 7
-				+ 0
+			+ MyPosition[0] * 9 * 7
+			+ MyPosition[1] * 7
+			+ 0
 		] = 1.0f;
 
 		// ----------------------------------------------------
@@ -1334,9 +1335,9 @@ pybind11::array_t<float> GetStateBatch(
 
 		data[
 			base
-				+ OpponentPosition[0] * 9 * 7
-				+ OpponentPosition[1] * 7
-				+ 1
+			+ OpponentPosition[0] * 9 * 7
+			+ OpponentPosition[1] * 7
+			+ 1
 		] = 1.0f;
 
 		// ----------------------------------------------------
@@ -1358,9 +1359,9 @@ pybind11::array_t<float> GetStateBatch(
 				{
 					data[
 						base
-							+ x * 9 * 7
-							+ y * 7
-							+ 2
+						+ x * 9 * 7
+						+ y * 7
+						+ 2
 					] = 1.0f;
 				}
 			}
@@ -1385,9 +1386,9 @@ pybind11::array_t<float> GetStateBatch(
 				{
 					data[
 						base
-							+ x * 9 * 7
-							+ y * 7
-							+ 3
+						+ x * 9 * 7
+						+ y * 7
+						+ 3
 					] = 1.0f;
 				}
 			}
@@ -1407,9 +1408,9 @@ pybind11::array_t<float> GetStateBatch(
 			{
 				data[
 					base
-						+ x * 9 * 7
-						+ y * 7
-						+ 4
+					+ x * 9 * 7
+					+ y * 7
+					+ 4
 				] = MyTurn;
 			}
 		}
@@ -1429,9 +1430,9 @@ pybind11::array_t<float> GetStateBatch(
 			{
 				data[
 					base
-						+ x * 9 * 7
-						+ y * 7
-						+ 5
+					+ x * 9 * 7
+					+ y * 7
+					+ 5
 				] = MyWall;
 			}
 		}
@@ -1451,9 +1452,9 @@ pybind11::array_t<float> GetStateBatch(
 			{
 				data[
 					base
-						+ x * 9 * 7
-						+ y * 7
-						+ 6
+					+ x * 9 * 7
+					+ y * 7
+					+ 6
 				] = OppWall;
 			}
 		}
